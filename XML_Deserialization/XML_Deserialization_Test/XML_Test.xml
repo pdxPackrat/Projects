@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<AddressDirectory id="1">
+  <DirectoryOwner>Mayank</DirectoryOwner>
+  <PinCode>110085</PinCode>
+  <Designation place="Delhi">Engineer</Designation>
+  <Address AddressId="12">
+    <HouseNo>4</HouseNo>
+    <StreetName>Rohini</StreetName>
+    <City>Delhi</City>  
+  </Address>
+  <Address AddressId="13">
+    <HouseNo>4</HouseNo>
+    <StreetName>Rohini</StreetName>
+    <City>Delhi</City>
+  </Address>
+</AddressDirectory>
