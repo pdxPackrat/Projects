@@ -24,7 +24,7 @@ namespace CinecanvasTest_Console
         public string id { get; set; }
 
         [XmlElement("TimeCodeRate")]
-        public string timeCodeRate { get; set; }
+        public int timeCodeRate { get; set; }
 
         [XmlElement("LoadFont")]
         public string loadFont { get; set; }
@@ -56,10 +56,10 @@ namespace CinecanvasTest_Console
         public int SpotNumber { get; set; }
 
         [XmlAttribute("TimeIn")]
-        public string TimeIn { get; set; }
+        public String TimeIn { get; set; }
 
         [XmlAttribute("TimeOut")]
-        public string TimeOut { get; set; }
+        public String TimeOut { get; set; }
 
         [XmlElement("Text")]
         public List<Text> text { get; set; }
