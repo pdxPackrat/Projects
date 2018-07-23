@@ -5,10 +5,10 @@ VisualStudioVersion = 15.0.27428.2037
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{6852F156-39A8-4482-88E1-7241060B096A}"
 	ProjectSection(SolutionItems) = preProject
-		..\CinecanvasTest_Console\DCDMSubtitle-2010.xsd = ..\CinecanvasTest_Console\DCDMSubtitle-2010.xsd
+		CinecanvasTest_Console\DCDMSubtitle-2010.xsd = CinecanvasTest_Console\DCDMSubtitle-2010.xsd
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CinecanvasTest_Console", "..\CinecanvasTest_Console\CinecanvasTest_Console.csproj", "{D3EA0634-C2BD-47B5-B36C-B1AED720551E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CinecanvasTest_Console", "CinecanvasTest_Console\CinecanvasTest_Console.csproj", "{D3EA0634-C2BD-47B5-B36C-B1AED720551E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
