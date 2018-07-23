@@ -91,6 +91,12 @@ namespace CinecanvasTest_Console
             return (1000 / timeCodeRate);
         }
 
+        /// <summary>
+        /// Used this testMethod to test how the System.Timers functionality worked.  At this point
+        /// I've determined we don't need this functionality, but saving it for now for reference
+        /// </summary>
+        /// <param name="source"></param>
+        /// <param name="e"></param>
         static public void testMethod(Object source, System.Timers.ElapsedEventArgs e)
         {
             // Console.WriteLine("The Elapsed event was raised at {0}", e.SignalTime);
