@@ -11,15 +11,35 @@ using System.Timers;
 using System.Diagnostics; // for Stopwatch
 using System.Globalization;
 
+using CommandLine;
+
 namespace CinecanvasTest_Console
 {
+    class Options
+    {
+        [Option('f', "file", Required = true, HelpText = "Cinecanvas file to be processed.")]
+        public string inputFile { get; set; }
+    }
+
     class Program
     {
         static void Main(string[] args)
         {
+
+            CommandLine.Parser.Default.ParseArguments<Options>(args)
+                .WithParsed<Options>(opts => ProcessCinecanvasFile(opts))
+                .WithNotParsed<Options>((errs) => HandleParseError(errs));
+        }
+
+        static void HandleParseError(IEnumerable<Error> errs)
+        {
+        }
+
+        private static void ProcessCinecanvasFile(Options options)
+        {
             XmlSerializer deserializer = new XmlSerializer(typeof(SubtitleReel));
 
-            TextReader reader = new StreamReader("Whitney_23.976_Captions_DCinema2010.xml");
+            TextReader reader = new StreamReader(options.inputFile);
 
             object obj = deserializer.Deserialize(reader);
 
@@ -27,12 +47,10 @@ namespace CinecanvasTest_Console
 
             reader.Close();
 
-            int result = XmlData.subtitleList.font.subtitle.Count;
-            int timerTickRate;
+            int totalSubtitleCount = XmlData.subtitleList.font.subtitle.Count;
+            int timerTickRate = calculateTimerTickRate(XmlData.timeCodeRate);
 
-            timerTickRate = calculateTimerTickRate(XmlData.timeCodeRate);
-
-            Console.WriteLine($"Total Subtitles Entries not counting multiple lines: {result}");
+            Console.WriteLine($"Total Subtitles Entries not counting multiple lines: {totalSubtitleCount}");
 
 
             //Timer elapsedTime = new Timer(timerTickRate);
@@ -50,7 +68,7 @@ namespace CinecanvasTest_Console
             // Console.WriteLine("Press the Enter key to exit the program at any time ... ");
             // Console.ReadLine();
 
-            foreach(Subtitle subtitle in XmlData.subtitleList.font.subtitle)
+            foreach (Subtitle subtitle in XmlData.subtitleList.font.subtitle)
             {
                 // TimeSpan timeIn = TimeSpan.Parse(subtitle.TimeIn);
                 // TimeSpan timeOut = TimeSpan.Parse(subtitle.TimeOut);
@@ -60,7 +78,7 @@ namespace CinecanvasTest_Console
                 subtitleTimeEntry timeIn = new subtitleTimeEntry(subtitle.TimeIn, timerTickRate);
                 subtitleTimeEntry timeOut = new subtitleTimeEntry(subtitle.TimeOut, timerTickRate);
 
-                bool subtitlePrinted = false; 
+                bool subtitlePrinted = false;
                 do
                 {
                     subtitlePrinted = false;
