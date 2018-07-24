@@ -30,6 +30,11 @@ namespace CinecanvasTest_Console
 
                 time = new TimeSpan(0, hours, minutes, seconds, milliseconds);  // the first 0 is for the days value
             }
+            else
+            {
+                string errorMessage = "Invalid format for the TimeEntry object: " + timeEntry;
+                throw new FormatException(errorMessage);
+            }
         }
 
         public int hours { get; set; }

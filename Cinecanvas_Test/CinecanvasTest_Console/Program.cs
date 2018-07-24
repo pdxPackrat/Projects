@@ -19,6 +19,12 @@ namespace CinecanvasTest_Console
     {
         [Option('f', "file", Required = true, HelpText = "Cinecanvas file to be processed.")]
         public string inputFile { get; set; }
+
+        [Option('t', "timeOffset", Required = false, HelpText = "Time offset to begin with in format of 'HH:MM:SS:FF'")]
+        public string timeOffset { get; set; }
+
+        [Option('d', "debugOutput", Required = false, HelpText = "Only use for debugging purposes")]
+        public bool debugOutput { get; set; }
     }
 
     class Program
@@ -50,58 +56,97 @@ namespace CinecanvasTest_Console
             int totalSubtitleCount = XmlData.subtitleList.font.subtitle.Count;
             int timerTickRate = calculateTimerTickRate(XmlData.timeCodeRate);
 
-            Console.WriteLine($"Total Subtitles Entries not counting multiple lines: {totalSubtitleCount}");
+            subtitleTimeEntry timeOffset;
 
-
-            //Timer elapsedTime = new Timer(timerTickRate);
-            //elapsedTime.Elapsed += testMethod;
-            //elapsedTime.AutoReset = true;
-            //elapsedTime.Enabled = true; 
-
-            // create new Stopwatch
-            Stopwatch stopwatch = new Stopwatch();
-
-            // Begin timing
-            stopwatch.Start();
-
-            // Console.WriteLine(" All Done ");
-            // Console.WriteLine("Press the Enter key to exit the program at any time ... ");
-            // Console.ReadLine();
-
-            foreach (Subtitle subtitle in XmlData.subtitleList.font.subtitle)
+            try
             {
-                // TimeSpan timeIn = TimeSpan.Parse(subtitle.TimeIn);
-                // TimeSpan timeOut = TimeSpan.Parse(subtitle.TimeOut);
-                // TimeSpan timeIn = TimeSpan.ParseExact(subtitle.TimeIn, "G", CultureInfo.CurrentCulture);
-                // TimeSpan timeOut = TimeSpan.ParseExact(subtitle.TimeOut, "G", CultureInfo.CurrentCulture);
 
-                subtitleTimeEntry timeIn = new subtitleTimeEntry(subtitle.TimeIn, timerTickRate);
-                subtitleTimeEntry timeOut = new subtitleTimeEntry(subtitle.TimeOut, timerTickRate);
-
-                bool subtitlePrinted = false;
-                do
+                if (options.timeOffset != null)
                 {
-                    subtitlePrinted = false;
+                    timeOffset = new subtitleTimeEntry(options.timeOffset, timerTickRate);
+                }
+                else
+                {
+                    timeOffset = new subtitleTimeEntry("00:00:00:00", 0);
+                }
 
-                    if (stopwatch.Elapsed > timeIn.time)
+
+                Console.WriteLine($"Total Subtitles Entries not counting multiple lines: {totalSubtitleCount}");
+
+
+                //Timer elapsedTime = new Timer(timerTickRate);
+                //elapsedTime.Elapsed += testMethod;
+                //elapsedTime.AutoReset = true;
+                //elapsedTime.Enabled = true; 
+
+                // create new Stopwatch
+                StopwatchWithOffset stopwatch = new StopwatchWithOffset(timeOffset.time);
+
+
+                // Begin timing
+                stopwatch.Start();
+
+                // Console.WriteLine(" All Done ");
+                // Console.WriteLine("Press the Enter key to exit the program at any time ... ");
+                // Console.ReadLine();
+
+                foreach (Subtitle subtitle in XmlData.subtitleList.font.subtitle)
+                {
+                    // TimeSpan timeIn = TimeSpan.Parse(subtitle.TimeIn);
+                    // TimeSpan timeOut = TimeSpan.Parse(subtitle.TimeOut);
+                    // TimeSpan timeIn = TimeSpan.ParseExact(subtitle.TimeIn, "G", CultureInfo.CurrentCulture);
+                    // TimeSpan timeOut = TimeSpan.ParseExact(subtitle.TimeOut, "G", CultureInfo.CurrentCulture);
+
+                    subtitleTimeEntry timeIn = new subtitleTimeEntry(subtitle.TimeIn, timerTickRate);
+                    subtitleTimeEntry timeOut = new subtitleTimeEntry(subtitle.TimeOut, timerTickRate);
+
+                    bool subtitlePrinted = false;
+                    bool outputDebugInfo = false;
+
+                    do
                     {
-                        int spot = subtitle.SpotNumber;
-                        //Console.WriteLine($"SpotNumber: {spot}");
+                        subtitlePrinted = false;
 
-                        foreach (Text text in subtitle.text)
+                        if (options.debugOutput == true && outputDebugInfo == false)
                         {
-                            int pos = text.vPosition;
-                            Console.WriteLine($"{spot},{pos}: {text.subtitleText}");
+                            Console.Error.WriteLine($"Waiting @ Spot#: {subtitle.SpotNumber}");
+                            Console.Error.WriteLine($"TimeIn: {timeIn.time},  TimeOut: {timeOut.time}");
+                            Console.Error.WriteLine($"Stopwatch: {stopwatch.ElapsedTimeSpan}");
+
+                            outputDebugInfo = true;
                         }
 
-                        subtitlePrinted = true;
-                    }
-                } while (subtitlePrinted == false);
+                        if ((stopwatch.ElapsedTimeSpan > timeIn.time) 
+                            && (stopwatch.ElapsedTimeSpan < timeOut.time))
+                        {
+                            int spot = subtitle.SpotNumber;
+                            //Console.WriteLine($"SpotNumber: {spot}");
 
+                            foreach (Text text in subtitle.text)
+                            {
+                                int pos = text.vPosition;
+                                Console.WriteLine($"{spot},{pos}: {text.subtitleText}");
+                            }
+
+                            subtitlePrinted = true;
+                            outputDebugInfo = false;
+                        }
+
+                        if (stopwatch.ElapsedTimeSpan > timeOut.time)
+                            break;
+
+                    } while (subtitlePrinted == false);
+
+                }
+
+                stopwatch.Stop();
+                //Console.WriteLine($"Time elapsed: {stopwatch.Elapsed}");
             }
-
-            stopwatch.Stop();
-            //Console.WriteLine($"Time elapsed: {stopwatch.Elapsed}");
+            catch (FormatException e)
+            {
+                Console.WriteLine($"{e.HResult}: {e.Message}");
+                Environment.Exit(0);
+            }
         }
 
         static public int calculateTimerTickRate(int timeCodeRate)
