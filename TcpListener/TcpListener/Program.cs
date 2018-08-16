@@ -14,6 +14,7 @@ namespace MyTcpListener
     {
         static void Main(string[] args)
         {
+
             // var thread1 = new System.Threading.Thread(ListenerProcess);
             // var thread2 = new System.Threading.Thread(ListenerProcess);
             // thread1.Start();
@@ -27,11 +28,21 @@ namespace MyTcpListener
             TcpClient client;
 
             listener.Start();
+            Console.WriteLine("Waiting for a connection ... ");
 
-            while (true)
+            try
             {
-                client = listener.AcceptTcpClient();
-                ThreadPool.QueueUserWorkItem(ListenerProcess, client);
+                while (true)
+                {
+                    client = listener.AcceptTcpClient();
+
+                    ThreadPool.QueueUserWorkItem(ListenerProcess, client);
+                }
+            }
+            finally
+            {
+                Console.WriteLine("\nHit enter to continue...");
+                Console.Read();
             }
         }
 
@@ -39,37 +50,30 @@ namespace MyTcpListener
         {
             var MyClient = (TcpClient)obj;
 
-            TcpListener server = null;
+            Thread thread = Thread.CurrentThread;
 
             try
             {
-
-                // TcpListener server = new TcpListener(port);
-                server = new TcpListener(localAddr, port);
-
-                // Start listening for client requests
-                server.Start();
-
+                
                 // Buffer for reading data
                 Byte[] bytes = new Byte[256];
                 String data = null;
                 String command = "";
+                bool Listening = true;
 
                 // Enter the listening loop.
-                while (true)
+                while (Listening == true)
                 {
-                    Console.Write("Waiting for a connection ... ");
 
                     // Perform a blocking call to accept requests.
                     // You could also use server.AcceptSocket() here.
-                    TcpClient client = server.AcceptTcpClient();
-                    Console.WriteLine("Connected!");
+                    Console.WriteLine($"Thread #{thread.ManagedThreadId}: Connected!");
 
                     // Get a stream object for reading and writing.
-                    NetworkStream stream = client.GetStream();
+                    NetworkStream stream = MyClient.GetStream();
 
                     // Send back a response.
-                    byte[] msg = System.Text.Encoding.ASCII.GetBytes("CONNECTED:  WAITING FOR INPUT\n");
+                    byte[] msg = System.Text.Encoding.ASCII.GetBytes("CONNECTED:  WAITING FOR INPUT\r\n");
                     stream.Write(msg, 0, msg.Length);
 
                     // Prepare for looping
@@ -98,7 +102,7 @@ namespace MyTcpListener
                             {
                                 if (command == "CANCEL" || command == "QUIT")
                                 {
-                                    Console.WriteLine("CANCEL/QUIT command received - terminating connection");
+                                    Console.WriteLine($"Thread #{thread.ManagedThreadId}: CANCEL/QUIT command received - terminating connection");
                                     CancelCommandReceived = true;
                                 }
                                 else
@@ -125,7 +129,8 @@ namespace MyTcpListener
                     }
 
                     // Shutdown and end the connection.
-                    client.Close();
+                    MyClient.Close();
+                    Listening = false;
                 }
 
             }
@@ -136,11 +141,11 @@ namespace MyTcpListener
             finally
             {
                 // Stop listening for new clients.
-                server.Stop();
+                // server.Stop();
+
+                Console.WriteLine($"Thread #{thread.ManagedThreadId}: Connection Terminated");
             }
 
-            Console.WriteLine("\nHit enter to continue...");
-            Console.Read();
         }
     }
 }
