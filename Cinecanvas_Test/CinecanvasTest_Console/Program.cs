@@ -18,13 +18,13 @@ namespace CinecanvasTest_Console
     class Options
     {
         [Option('f', "file", Required = true, HelpText = "Cinecanvas file to be processed.")]
-        public string inputFile { get; set; }
+        public string InputFile { get; set; }
 
         [Option('t', "timeOffset", Required = false, HelpText = "Time offset to begin with in format of 'HH:MM:SS:FF'")]
-        public string timeOffset { get; set; }
+        public string TimeOffset { get; set; }
 
         [Option('d', "debugOutput", Required = false, HelpText = "Only use for debugging purposes")]
-        public bool debugOutput { get; set; }
+        public bool DebugOutput { get; set; }
     }
 
     class Program
@@ -45,7 +45,7 @@ namespace CinecanvasTest_Console
         {
             XmlSerializer deserializer = new XmlSerializer(typeof(SubtitleReel));
 
-            TextReader reader = new StreamReader(options.inputFile);
+            TextReader reader = new StreamReader(options.InputFile);
 
             object obj = deserializer.Deserialize(reader);
 
@@ -53,25 +53,25 @@ namespace CinecanvasTest_Console
 
             reader.Close();
 
-            int totalSubtitleCount = XmlData.subtitleList.font.subtitle.Count;
-            int timerTickRate = calculateTimerTickRate(XmlData.timeCodeRate);
+            int TotalSubtitleCount = XmlData.subtitleList.Font.Subtitle.Count;
+            int TimerTickRate = CalculateTimerTickRate(XmlData.timeCodeRate);
 
-            subtitleTimeEntry timeOffset;
+            subtitleTimeEntry TimeOffset;
 
             try
             {
 
-                if (options.timeOffset != null)
+                if (options.TimeOffset != null)
                 {
-                    timeOffset = new subtitleTimeEntry(options.timeOffset, timerTickRate);
+                    TimeOffset = new subtitleTimeEntry(options.TimeOffset, TimerTickRate);
                 }
                 else
                 {
-                    timeOffset = new subtitleTimeEntry("00:00:00:00", 0);
+                    TimeOffset = new subtitleTimeEntry("00:00:00:00", 0);
                 }
 
 
-                Console.WriteLine($"Total Subtitles Entries not counting multiple lines: {totalSubtitleCount}");
+                Console.WriteLine($"Total Subtitles Entries not counting multiple lines: {TotalSubtitleCount}");
 
 
                 //Timer elapsedTime = new Timer(timerTickRate);
@@ -80,7 +80,7 @@ namespace CinecanvasTest_Console
                 //elapsedTime.Enabled = true; 
 
                 // create new Stopwatch
-                StopwatchWithOffset stopwatch = new StopwatchWithOffset(timeOffset.time);
+                StopwatchWithOffset stopwatch = new StopwatchWithOffset(TimeOffset.time);
 
 
                 // Begin timing
@@ -90,15 +90,15 @@ namespace CinecanvasTest_Console
                 // Console.WriteLine("Press the Enter key to exit the program at any time ... ");
                 // Console.ReadLine();
 
-                foreach (Subtitle subtitle in XmlData.subtitleList.font.subtitle)
+                foreach (Subtitle subtitle in XmlData.subtitleList.Font.Subtitle)
                 {
                     // TimeSpan timeIn = TimeSpan.Parse(subtitle.TimeIn);
                     // TimeSpan timeOut = TimeSpan.Parse(subtitle.TimeOut);
                     // TimeSpan timeIn = TimeSpan.ParseExact(subtitle.TimeIn, "G", CultureInfo.CurrentCulture);
                     // TimeSpan timeOut = TimeSpan.ParseExact(subtitle.TimeOut, "G", CultureInfo.CurrentCulture);
 
-                    subtitleTimeEntry timeIn = new subtitleTimeEntry(subtitle.TimeIn, timerTickRate);
-                    subtitleTimeEntry timeOut = new subtitleTimeEntry(subtitle.TimeOut, timerTickRate);
+                    subtitleTimeEntry timeIn = new subtitleTimeEntry(subtitle.TimeIn, TimerTickRate);
+                    subtitleTimeEntry timeOut = new subtitleTimeEntry(subtitle.TimeOut, TimerTickRate);
 
                     bool subtitlePrinted = false;
                     bool outputDebugInfo = false;
@@ -107,8 +107,9 @@ namespace CinecanvasTest_Console
                     {
                         subtitlePrinted = false;
 
-                        if (options.debugOutput == true && outputDebugInfo == false)
+                        if (options.DebugOutput == true && outputDebugInfo == false)
                         {
+                            Console.Error.WriteLine("");
                             Console.Error.WriteLine($"Waiting @ Spot#: {subtitle.SpotNumber}");
                             Console.Error.WriteLine($"TimeIn: {timeIn.time},  TimeOut: {timeOut.time}");
                             Console.Error.WriteLine($"Stopwatch: {stopwatch.ElapsedTimeSpan}");
@@ -122,10 +123,10 @@ namespace CinecanvasTest_Console
                             int spot = subtitle.SpotNumber;
                             //Console.WriteLine($"SpotNumber: {spot}");
 
-                            foreach (Text text in subtitle.text)
+                            foreach (Text text in subtitle.Text)
                             {
-                                int pos = text.vPosition;
-                                Console.WriteLine($"{spot},{pos}: {text.subtitleText}");
+                                int pos = text.VPosition;
+                                Console.WriteLine($"{spot},{pos}: {text.SubtitleText}");
                             }
 
                             subtitlePrinted = true;
@@ -149,7 +150,7 @@ namespace CinecanvasTest_Console
             }
         }
 
-        static public int calculateTimerTickRate(int timeCodeRate)
+        static public int CalculateTimerTickRate(int timeCodeRate)
         {
             return (1000 / timeCodeRate);
         }
@@ -160,7 +161,7 @@ namespace CinecanvasTest_Console
         /// </summary>
         /// <param name="source"></param>
         /// <param name="e"></param>
-        static public void testMethod(Object source, System.Timers.ElapsedEventArgs e)
+        static public void TestMethod(Object source, System.Timers.ElapsedEventArgs e)
         {
             // Console.WriteLine("The Elapsed event was raised at {0}", e.SignalTime);
         }

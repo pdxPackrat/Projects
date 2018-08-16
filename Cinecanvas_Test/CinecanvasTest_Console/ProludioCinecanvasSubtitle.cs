@@ -35,19 +35,19 @@ namespace CinecanvasTest_Console
     public class SubtitleList
     {
         [XmlElement("Font")]
-        public Font font { get; set; }
+        public Font Font { get; set; }
     }
 
     public class Font
     {
         [XmlAttribute("ID")]
-        public string id { get; set; }
+        public string Id { get; set; }
 
         [XmlAttribute("Size")]
-        public string size { get; set; }
+        public string Size { get; set; }
 
         [XmlElement ("Subtitle")]
-        public List<Subtitle> subtitle { get; set; }
+        public List<Subtitle> Subtitle { get; set; }
     }
 
     public class Subtitle
@@ -62,15 +62,15 @@ namespace CinecanvasTest_Console
         public String TimeOut { get; set; }
 
         [XmlElement("Text")]
-        public List<Text> text { get; set; }
+        public List<Text> Text { get; set; }
     }
 
     public class Text
     {
         [XmlAttribute("Vposition")]
-        public int vPosition { get; set; }
+        public int VPosition { get; set; }
         
         [XmlText]
-        public string subtitleText { get; set; }
+        public string SubtitleText { get; set; }
     }
 }

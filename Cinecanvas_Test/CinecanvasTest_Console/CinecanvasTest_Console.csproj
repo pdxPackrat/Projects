@@ -65,7 +65,9 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Damsel-VOD_2398_CC_eng.xml" />
-    <Content Include="Disobedience_23.98_Captions.xml" />
+    <Content Include="Disobedience_23.98_Captions.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Whitney_23.976_Captions_DCinema2010.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <SubType>Designer</SubType>
