@@ -57,9 +57,9 @@ namespace MyTcpListener
                 
                 // Buffer for reading data
                 Byte[] bytes = new Byte[256];
-                String data = null;
-                String command = "";
-                bool Listening = true;
+                String data = null;    // the data received from the listener
+                String command = "";   // the parsed command received from the listener
+                bool Listening = true; // boolean that controls the while-loop logic
 
                 // Enter the listening loop.
                 while (Listening == true)
@@ -79,7 +79,7 @@ namespace MyTcpListener
                     // Prepare for looping
                     data = null;
                     int i;
-                    bool CancelCommandReceived = false;
+                    bool CancelCommandReceived = false;  // boolean used to control the while-loop logic
 
                     // loop to receive all of the data sent by the client.
                     while ((CancelCommandReceived == false) && ((i = stream.Read(bytes, 0, bytes.Length))!= 0))
@@ -87,9 +87,9 @@ namespace MyTcpListener
                         // Translate data bytes to an ASCII string.
                         data = System.Text.Encoding.ASCII.GetString(bytes, 0, i);
 
-                        if (data == "\u0003")
+                        if (data == "\u0003") // checking for a CTRL+C from the connected terminal here
                         {
-                            CancelCommandReceived = true;
+                            CancelCommandReceived = true;  // set boolean logic to exit the while-loop
                             Console.WriteLine("Received Cancel Command");
                         }
                         else
@@ -98,6 +98,7 @@ namespace MyTcpListener
                             // Process the data sent by the client.
                             data = data.ToUpper();
 
+                            // If the data segment received is a CRLF, then take whatever parsed command so far as process it
                             if (data == "\r\n")
                             {
                                 if (command == "CANCEL" || command == "QUIT")
@@ -114,7 +115,8 @@ namespace MyTcpListener
                             }
                             else
                             {
-                                Console.WriteLine($"Received: {data}");
+                                // Echo the data received and continue
+                                // Console.WriteLine($"Received: {data}");
                                 command = String.Concat(command, data);
                             }
 
