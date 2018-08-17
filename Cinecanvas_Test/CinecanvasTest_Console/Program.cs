@@ -11,7 +11,7 @@ using System.Timers;
 using System.Diagnostics; // for Stopwatch
 using System.Globalization;
 
-using CommandLine;
+using CommandLine;   // For the command-line options/flags that are passed in at launch
 
 namespace CinecanvasTest_Console
 {
@@ -43,31 +43,23 @@ namespace CinecanvasTest_Console
 
         private static void ProcessCinecanvasFile(Options options)
         {
-            XmlSerializer deserializer = new XmlSerializer(typeof(SubtitleReel));
+            SubtitleReel XmlData = LoadCinecanvasFile(options);
 
-            TextReader reader = new StreamReader(options.InputFile);
+            int TotalSubtitleCount = XmlData.SubtitleList.Font.Subtitle.Count;
+            int TimerTickRate = CalculateTimerTickRate(XmlData.TimeCodeRate);
 
-            object obj = deserializer.Deserialize(reader);
-
-            SubtitleReel XmlData = (SubtitleReel)obj;
-
-            reader.Close();
-
-            int TotalSubtitleCount = XmlData.subtitleList.Font.Subtitle.Count;
-            int TimerTickRate = CalculateTimerTickRate(XmlData.timeCodeRate);
-
-            subtitleTimeEntry TimeOffset;
+            SubtitleTimeEntry TimeOffset;
 
             try
             {
 
                 if (options.TimeOffset != null)
                 {
-                    TimeOffset = new subtitleTimeEntry(options.TimeOffset, TimerTickRate);
+                    TimeOffset = new SubtitleTimeEntry(options.TimeOffset, TimerTickRate);
                 }
                 else
                 {
-                    TimeOffset = new subtitleTimeEntry("00:00:00:00", 0);
+                    TimeOffset = new SubtitleTimeEntry("00:00:00:00", 0);
                 }
 
 
@@ -80,67 +72,67 @@ namespace CinecanvasTest_Console
                 //elapsedTime.Enabled = true; 
 
                 // create new Stopwatch
-                StopwatchWithOffset stopwatch = new StopwatchWithOffset(TimeOffset.time);
+                StopwatchWithOffset Stopwatch = new StopwatchWithOffset(TimeOffset.Time);
 
 
                 // Begin timing
-                stopwatch.Start();
+                Stopwatch.Start();
 
                 // Console.WriteLine(" All Done ");
                 // Console.WriteLine("Press the Enter key to exit the program at any time ... ");
                 // Console.ReadLine();
 
-                foreach (Subtitle subtitle in XmlData.subtitleList.Font.Subtitle)
+                foreach (Subtitle Subtitle in XmlData.SubtitleList.Font.Subtitle)
                 {
                     // TimeSpan timeIn = TimeSpan.Parse(subtitle.TimeIn);
                     // TimeSpan timeOut = TimeSpan.Parse(subtitle.TimeOut);
                     // TimeSpan timeIn = TimeSpan.ParseExact(subtitle.TimeIn, "G", CultureInfo.CurrentCulture);
                     // TimeSpan timeOut = TimeSpan.ParseExact(subtitle.TimeOut, "G", CultureInfo.CurrentCulture);
 
-                    subtitleTimeEntry timeIn = new subtitleTimeEntry(subtitle.TimeIn, TimerTickRate);
-                    subtitleTimeEntry timeOut = new subtitleTimeEntry(subtitle.TimeOut, TimerTickRate);
+                    SubtitleTimeEntry TimeIn = new SubtitleTimeEntry(Subtitle.TimeIn, TimerTickRate);
+                    SubtitleTimeEntry TimeOut = new SubtitleTimeEntry(Subtitle.TimeOut, TimerTickRate);
 
-                    bool subtitlePrinted = false;
-                    bool outputDebugInfo = false;
+                    bool SubtitlePrinted = false;
+                    bool OutputDebugInfo = false;
 
                     do
                     {
-                        subtitlePrinted = false;
+                        SubtitlePrinted = false;
 
-                        if (options.DebugOutput == true && outputDebugInfo == false)
+                        if (options.DebugOutput == true && OutputDebugInfo == false)
                         {
                             Console.Error.WriteLine("");
-                            Console.Error.WriteLine($"Waiting @ Spot#: {subtitle.SpotNumber}");
-                            Console.Error.WriteLine($"TimeIn: {timeIn.time},  TimeOut: {timeOut.time}");
-                            Console.Error.WriteLine($"Stopwatch: {stopwatch.ElapsedTimeSpan}");
+                            Console.Error.WriteLine($"Waiting @ Spot#: {Subtitle.SpotNumber}");
+                            Console.Error.WriteLine($"TimeIn: {TimeIn.Time},  TimeOut: {TimeOut.Time}");
+                            Console.Error.WriteLine($"Stopwatch: {Stopwatch.ElapsedTimeSpan}");
 
-                            outputDebugInfo = true;
+                            OutputDebugInfo = true;
                         }
 
-                        if ((stopwatch.ElapsedTimeSpan > timeIn.time) 
-                            && (stopwatch.ElapsedTimeSpan < timeOut.time))
+                        if ((Stopwatch.ElapsedTimeSpan > TimeIn.Time)
+                            && (Stopwatch.ElapsedTimeSpan < TimeOut.Time))
                         {
-                            int spot = subtitle.SpotNumber;
+                            int Spot = Subtitle.SpotNumber;
                             //Console.WriteLine($"SpotNumber: {spot}");
 
-                            foreach (Text text in subtitle.Text)
+                            foreach (Text Text in Subtitle.Text)
                             {
-                                int pos = text.VPosition;
-                                Console.WriteLine($"{spot},{pos}: {text.SubtitleText}");
+                                int Position = Text.VPosition;
+                                Console.WriteLine($"{Spot},{Position}: {Text.SubtitleText}");
                             }
 
-                            subtitlePrinted = true;
-                            outputDebugInfo = false;
+                            SubtitlePrinted = true;
+                            OutputDebugInfo = false;
                         }
 
-                        if (stopwatch.ElapsedTimeSpan > timeOut.time)
+                        if (Stopwatch.ElapsedTimeSpan > TimeOut.Time)
                             break;
 
-                    } while (subtitlePrinted == false);
+                    } while (SubtitlePrinted == false);
 
                 }
 
-                stopwatch.Stop();
+                Stopwatch.Stop();
                 //Console.WriteLine($"Time elapsed: {stopwatch.Elapsed}");
             }
             catch (FormatException e)
@@ -148,6 +140,27 @@ namespace CinecanvasTest_Console
                 Console.WriteLine($"{e.HResult}: {e.Message}");
                 Environment.Exit(0);
             }
+        }
+
+        private static SubtitleReel LoadCinecanvasFile(Options options)
+        {
+            // Define the XmlSerializer casting to type SubtitleReel
+            XmlSerializer Deserializer = new XmlSerializer(typeof(SubtitleReel));
+
+            // Open the input file for reading
+            TextReader Reader = new StreamReader(options.InputFile);
+
+            // Deserialize the input file
+            object DeserializedData = Deserializer.Deserialize(Reader);
+
+            // Cast the deserialized data to the SubtitleReel type
+            SubtitleReel XmlData = (SubtitleReel)DeserializedData;
+
+            // Close the input file stream
+            Reader.Close();
+
+            // Send the deserialized data pointer back to the calling routine
+            return XmlData;
         }
 
         static public int CalculateTimerTickRate(int timeCodeRate)

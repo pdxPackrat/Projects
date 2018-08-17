@@ -21,16 +21,16 @@ namespace CinecanvasTest_Console
     public class SubtitleReel
     {
         [XmlElement ("Id")]
-        public string id { get; set; }
+        public string Id { get; set; }
 
         [XmlElement("TimeCodeRate")]
-        public int timeCodeRate { get; set; }
+        public int TimeCodeRate { get; set; }
 
         [XmlElement("LoadFont")]
-        public string loadFont { get; set; }
+        public string LoadFont { get; set; }
 
         [XmlElement("SubtitleList")]
-        public SubtitleList subtitleList { get; set; }
+        public SubtitleList SubtitleList { get; set; }
     }
     public class SubtitleList
     {
