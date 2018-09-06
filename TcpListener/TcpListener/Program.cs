@@ -21,10 +21,14 @@ namespace MyTcpListener
             // thread2.Start();
 
             // Set the TcpListener on port 13000
-            Int32 port = 13000;
-            IPAddress localAddr = IPAddress.Parse("127.0.0.1");
+            Int32 Port = 13000;
+            Int32 AltPort = 4170;
+            IPAddress LocalAddr = IPAddress.Parse("127.0.0.1");
 
-            TcpListener listener = new TcpListener(localAddr, port);
+            //TcpListener listener = new TcpListener(IPAddress.Any, port);
+            TcpListener listener = new TcpListener(LocalAddr, Port);
+            TcpListener listener2 = new TcpListener(LocalAddr, AltPort);
+
             TcpClient client;
 
             listener.Start();
@@ -34,7 +38,16 @@ namespace MyTcpListener
             {
                 while (true)
                 {
+                    // Perform a blocking call to accept requests.
+                    // You could also use server.AcceptSocket() here.
                     client = listener.AcceptTcpClient();
+
+                    // Some logic I threw in to get a quick idea of how many worker threads were available (2047)
+                    // int WorkerThreadCount;
+                    // int PortThreadCount;
+
+                    // ThreadPool.GetAvailableThreads(out WorkerThreadCount, out PortThreadCount);
+                    // Console.WriteLine($"There are {WorkerThreadCount} threads available for connection");
 
                     ThreadPool.QueueUserWorkItem(ListenerProcess, client);
                 }
@@ -65,8 +78,6 @@ namespace MyTcpListener
                 while (Listening == true)
                 {
 
-                    // Perform a blocking call to accept requests.
-                    // You could also use server.AcceptSocket() here.
                     Console.WriteLine($"Thread #{thread.ManagedThreadId}: Connected!");
 
                     // Get a stream object for reading and writing.
@@ -98,7 +109,7 @@ namespace MyTcpListener
                             // Process the data sent by the client.
                             data = data.ToUpper();
 
-                            // If the data segment received is a CRLF, then take whatever parsed command so far as process it
+                            // If the data segment received is a CRLF, then take whatever parsed command so far and process it
                             if (data == "\r\n")
                             {
                                 if (command == "CANCEL" || command == "QUIT")
@@ -108,7 +119,7 @@ namespace MyTcpListener
                                 }
                                 else
                                 {
-                                    Console.WriteLine($"Command Received: {command}");
+                                    Console.WriteLine($"Thread #{thread.ManagedThreadId}:  Command Received: {command}");
                                 }
 
                                 command = "";

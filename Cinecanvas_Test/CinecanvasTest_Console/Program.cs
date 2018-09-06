@@ -82,6 +82,8 @@ namespace CinecanvasTest_Console
                 // Console.WriteLine("Press the Enter key to exit the program at any time ... ");
                 // Console.ReadLine();
 
+                UInt32 loopCounter = 0;
+
                 foreach (Subtitle Subtitle in XmlData.SubtitleList.Font.Subtitle)
                 {
                     // TimeSpan timeIn = TimeSpan.Parse(subtitle.TimeIn);
@@ -97,6 +99,7 @@ namespace CinecanvasTest_Console
 
                     do
                     {
+                        loopCounter++; // increment loopCounter by 1 for each loop through the do-while loop (for debug purposes)
                         SubtitlePrinted = false;
 
                         if (options.DebugOutput == true && OutputDebugInfo == false)
@@ -105,6 +108,7 @@ namespace CinecanvasTest_Console
                             Console.Error.WriteLine($"Waiting @ Spot#: {Subtitle.SpotNumber}");
                             Console.Error.WriteLine($"TimeIn: {TimeIn.Time},  TimeOut: {TimeOut.Time}");
                             Console.Error.WriteLine($"Stopwatch: {Stopwatch.ElapsedTimeSpan}");
+                            Console.WriteLine($"Current LoopCount: {loopCounter}");
 
                             OutputDebugInfo = true;
                         }
