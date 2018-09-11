@@ -6,29 +6,29 @@ using System.Threading.Tasks;
 
 namespace CinecanvasTest_Console
 {
-    public class subtitleTimeEntry
+    public class SubtitleTimeEntry
     {
         // private int hoursField;
         // private int minutesField;
         // private int secondsField;
         // private int millisecondsField;
         
-        public subtitleTimeEntry(string timeEntry, int tickRate)
+        public SubtitleTimeEntry(string timeEntry, int tickRate)
         {
             // Need some string validation here at some point
 
-            var splitString = timeEntry.Split(':');
+            var SplitString = timeEntry.Split(':');
 
-            if (splitString.Length == 4)
+            if (SplitString.Length == 4)
             {
                 // This is what we are looking for
 
-                hours = int.Parse(splitString[0]);
-                minutes = int.Parse(splitString[1]);
-                seconds = int.Parse(splitString[2]);
-                milliseconds = (int.Parse(splitString[3]) * tickRate);
+                Hours = int.Parse(SplitString[0]);
+                Minutes = int.Parse(SplitString[1]);
+                Seconds = int.Parse(SplitString[2]);
+                Milliseconds = (int.Parse(SplitString[3]) * tickRate);
 
-                time = new TimeSpan(0, hours, minutes, seconds, milliseconds);  // the first 0 is for the days value
+                Time = new TimeSpan(0, Hours, Minutes, Seconds, Milliseconds);  // the first 0 is for the days value
             }
             else
             {
@@ -37,11 +37,11 @@ namespace CinecanvasTest_Console
             }
         }
 
-        public int hours { get; set; }
-        public int minutes { get; set; }
-        public int seconds { get; set; }
-        public int milliseconds { get; set; }
-        public TimeSpan time { get; set; }
+        public int Hours { get; set; }
+        public int Minutes { get; set; }
+        public int Seconds { get; set; }
+        public int Milliseconds { get; set; }
+        public TimeSpan Time { get; set; }
 
     }
 }
