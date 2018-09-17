@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RplCreator
+namespace SharedCommon
 {
     public sealed class Utf8StringWriter : StringWriter
     {

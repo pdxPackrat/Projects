@@ -8,6 +8,7 @@ using System.Xml;
 using System.Xml.Serialization;
 
 using CommandLine;
+using SharedCommon;
 
 namespace RplCreator
 {

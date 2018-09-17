@@ -59,6 +59,10 @@
       <Project>{0110cc8e-1e2a-466c-a1aa-0e3bafc256da}</Project>
       <Name>RplCreator</Name>
     </ProjectReference>
+    <ProjectReference Include="..\SharedCommon\SharedCommon.csproj">
+      <Project>{203b029c-d970-4c88-b356-2172aa613d51}</Project>
+      <Name>SharedCommon</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

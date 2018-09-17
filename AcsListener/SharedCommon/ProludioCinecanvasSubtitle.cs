@@ -8,7 +8,7 @@ using System.Xml;
 using System.Xml.Serialization;
 using System.IO;
 
-namespace RplCreator
+namespace SharedCommon
 {
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.6.1055.0")]

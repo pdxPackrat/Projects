@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
 
-namespace RplCreator
+namespace SharedCommon
 {
     // Need code in here at some point to support the concept of a collection of ReelResources
     // instead of doing it singly, but for now that's beyond my understanding
