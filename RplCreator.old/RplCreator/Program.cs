@@ -1,0 +1,143 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Xml;
+using System.Xml.Serialization;
+
+using CommandLine;
+
+namespace RplCreator
+{
+    class Options
+    {
+        [Option('f', "file", Required = true, HelpText = "CineCanvas file to be processed.")]
+        public string InputFile { get; set; }
+
+        [Option('d', "debug", Required = false, HelpText = "For debug purposes only")]
+        public bool DebugOutput { get; set; }
+
+        [Option('r', "ReelDuration", Required = false, HelpText = "Specify duration of the reel in the format of HH:MM:SS, enclosed by quotes.  If no duration is specified, then RplCreator will look at last subtitle time and add one minute to it.")]
+        public string ReelDuration { get; set; }
+    }
+
+    class Program
+    {
+        static void Main(string[] args)
+        {
+             CommandLine.Parser.Default.ParseArguments<Options>(args)
+                .WithParsed<Options>(opts => MainProcessing(opts))
+                .WithNotParsed<Options>((errs) => HandleParseError(errs));
+        }
+
+        private static void HandleParseError(IEnumerable<Error> errs)
+        {
+            Console.WriteLine("Note: RplCreator.exe must be ran from within a command prompt -- press any key to exit");
+            Console.Read();
+        }
+
+        private static void MainProcessing(Options options)
+        {
+            ResourcePresentationList Rpl = new ResourcePresentationList();
+            SubtitleReel XmlData = LoadCinecanvasFile(options.InputFile);
+
+            // Reminder:  PlayoutId is auto-generated in the ResourcePresentationList constructor
+
+            Rpl.ReelResources.EditRate = XmlData.EditRate;
+
+            Rpl.ReelResources.TimelineOffset = 0;  // we're always going to default to 0 for now for simplicity
+
+            if (options.ReelDuration != null)
+            {
+                RplReelDuration duration = new RplReelDuration(Rpl.ReelResources.EditRate, options.ReelDuration);
+                Rpl.ReelResources.ReelResource.Duration = duration.EditUnits;
+            }
+            else
+            {
+                int LastSubtitleElementNumber = XmlData.SubtitleList.Font.Subtitle.Count - 1;
+                string TimeOutString = XmlData.SubtitleList.Font.Subtitle[LastSubtitleElementNumber].TimeOut;
+
+                var TimeOutSplit = TimeOutString.Split(':');
+                if (TimeOutSplit.Length >= 2)
+                {
+                    uint hours = uint.Parse(TimeOutSplit[0]);
+                    uint minutes = uint.Parse(TimeOutSplit[1]);
+                    minutes += 1;
+                    if (minutes >= 60)
+                    {
+                        minutes -= 60;
+                        hours++;
+                    }
+
+                    string output = hours.ToString() + ":" + minutes.ToString();
+                    RplReelDuration duration = new RplReelDuration(Rpl.ReelResources.EditRate, output);
+                    Rpl.ReelResources.ReelResource.Duration = duration.EditUnits;
+                }
+                else
+                {
+                    Rpl.ReelResources.ReelResource.Duration = 0;
+                }
+            }
+
+            Rpl.ReelResources.ReelResource.EntryPoint = 0;  // For simplicity sake we are going to default to EntryPoint of 0 for now
+
+            if (XmlData.Language == "en" || XmlData.Language == "en-us")
+            {
+                Rpl.ReelResources.ReelResource.Language = "en-us";
+            }
+            else
+            {
+                Rpl.ReelResources.ReelResource.Language = XmlData.Language;
+            }
+
+            Rpl.ReelResources.ReelResource.ResourceType = "ClosedCaption";
+
+            Rpl.ReelResources.ReelResource.Id = XmlData.Id;
+            Rpl.ReelResources.ReelResource.IntrinsicDuration = Rpl.ReelResources.ReelResource.Duration;
+
+            string result = Path.GetFileName(options.InputFile);
+            Rpl.ReelResources.ReelResource.ResourceFile.ResourceText = "/CaptiView/" + result;
+
+            SerializeRplFile(Rpl);
+        }
+
+        private static SubtitleReel LoadCinecanvasFile(String inputFile)
+        {
+            // Define the XmlSerializer casting to type SubtitleReel
+            XmlSerializer Deserializer = new XmlSerializer(typeof(SubtitleReel));
+
+            // Open the input file for reading
+            TextReader Reader = new StreamReader(inputFile);
+
+            // Deserialize the input file
+            object DeserializedData = Deserializer.Deserialize(Reader);
+
+            // Cast the deserialized data to the SubtitleReel type
+            SubtitleReel XmlData = (SubtitleReel)DeserializedData;
+
+            // Close the input file stream
+            Reader.Close();
+
+            // Send the deserialized data pointer back to the calling routine
+            return XmlData;
+        }
+
+        private static void SerializeRplFile(ResourcePresentationList inputRpl)
+        {
+            XmlSerializerNamespaces ns = new XmlSerializerNamespaces();
+            ns.Add("rpl", "http://www.smptera.org/schemas/430-11/2010/RPL");
+
+
+            StringWriter writer = new Utf8StringWriter();
+
+
+            XmlSerializer xser = new XmlSerializer(typeof(ResourcePresentationList));
+            XmlWriterSettings settings = new XmlWriterSettings() { Encoding = new System.Text.UTF8Encoding(false) };
+            // XmlWriter writer = XmlWriter.Create("test.xml", settings);
+            xser.Serialize(writer, inputRpl, ns);
+            Console.WriteLine(writer);
+        }
+    }
+}
