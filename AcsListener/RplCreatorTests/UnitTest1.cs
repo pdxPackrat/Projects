@@ -13,7 +13,7 @@ namespace RplCreatorTests
     public class UnitTest1
     {
         [TestMethod]
-        public void TestMethod1()
+        public void TestRateNumeratorAndDenominator()
         {
             ResourcePresentationList Rpl = new ResourcePresentationList();
 
@@ -38,6 +38,14 @@ namespace RplCreatorTests
             string result = Path.GetFileName(filename);
 
             Assert.AreEqual("myfile.txt", result);
+        }
+
+        [TestMethod]
+        public void TestRplReelDurationWithZeroes()
+        {
+            RplReelDuration duration = new RplReelDuration("25 1", "00:00:00:00");
+            Assert.AreEqual((UInt64)0, duration.EditUnits);
+
         }
     }
 }

@@ -76,6 +76,7 @@
     <Compile Include="AcspTimelineExtension.cs" />
     <Compile Include="AcspUpdateTimelineRequest.cs" />
     <Compile Include="AcspUpdateTimelineResponse.cs" />
+    <Compile Include="ListenerProcessParams.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

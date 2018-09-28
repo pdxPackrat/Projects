@@ -10,17 +10,34 @@ using System.Threading.Tasks;
 using System.Timers;
 
 using CommandLine;
+using SharedCommon;
 using System.Diagnostics;
+using System.Xml.Serialization;
 
 namespace AcsListener
 {
     class Options
     {
+        private string _playtimeOffset = "0";
+
         [Option('d', "debug", Required = false, HelpText = "Use for debugging purposes - provides more verbose output")]
         public bool DebugOutput { get; set; }
 
-        [Option('f', "file", Required = false, HelpText = "Specify an RPL file which must be in format of *.xml")]
-        public string RplFile { get; set; }
+        [Option('r', "rplUrl", Required = true, HelpText = "Specify an RPL URL which may include either full URL with IP address (not localhost) or relative location, example: /CaptiView/rpl_test1.xml")]
+        public string RplUrl { get; set; }
+
+        [Option('o', "offset", Required = false, HelpText = "Playtime offset in form of -o HH:MM:SS, -o HH:MM, or -o MM")]
+        public string PlaytimeOffset
+        {
+            get
+            {
+                return _playtimeOffset;
+            }
+            set
+            {
+                this._playtimeOffset = value;
+            }
+        }
     }
 
     class Program
@@ -65,8 +82,11 @@ namespace AcsListener
                     client = listener.AcceptTcpClient();
                     Console.WriteLine("[MasterThread]: TcpClient Accepted, assigning child thread");
 
+                    // Set ListenerProcessParams for passing to the downstream process
+                    ListenerProcessParams processParams = new ListenerProcessParams(client, options.RplUrl, options.PlaytimeOffset);
+
                     // 2047 worker threads are available by default
-                    ThreadPool.QueueUserWorkItem(ListenerProcess, client);
+                    ThreadPool.QueueUserWorkItem(ListenerProcess, processParams);
                     Console.WriteLine("[MasterThread]: Waiting for another connection ... ");
                 }
             }
@@ -87,13 +107,37 @@ namespace AcsListener
             const int timeoutValue = 10000;
             // int numberOfBytes = 0;
             uint leaseSeconds = 60;
-            UInt32 testPlayoutId = 49520318;
-            UInt64 timelineStart = 0;
+            // UInt32 testPlayoutId = 49520318;
+            // UInt64 timelineStart = 0;
             // UInt64 timelineEditUnits = 14400;  // 24 (edit units per second) * 60 (seconds) * 10 (minutes)
-            UInt64 timelineEditUnits = 16000;  // 25 (edit units per second) * 60 (seconds) * 10 (minutes) = 15000, and adding another 1000 to make timecode 10:40
-            string testResourceUrl = "http://192.168.9.88/CaptiView/rpl_test1.xml";
-            var myClient = (TcpClient)obj;
+            // UInt64 timelineEditUnits = 16000;  // 25 (edit units per second) * 60 (seconds) * 10 (minutes) = 15000, and adding another 1000 to make timecode 10:40
+            // string testResourceUrl = "http://192.168.9.88/CaptiView/rpl_test1.xml";
+
+            var myParams = (ListenerProcessParams)obj;
+            TcpClient myClient = myParams.Client;
+            String rplUrlPath = myParams.UrlPath;
+            String timeOffset = myParams.TimeOffset;
             Thread thread = Thread.CurrentThread;
+
+            // This is presumably where the "LOAD" action's data would need to be taken from
+
+            ResourcePresentationList XmlData = LoadRplFromUrl(rplUrlPath);
+
+            UInt32 PlayoutId = XmlData.PlayoutId;
+            UInt64 timelineStart = XmlData.ReelResources.TimelineOffset;
+            String editRate = XmlData.ReelResources.EditRate;
+            RplReelDuration duration = new RplReelDuration(editRate, timeOffset);
+            UInt64 timelineEditUnits = duration.EditUnits;
+            string resourceUrl = rplUrlPath;
+
+            if (debugOutput is true)
+            {
+                Console.WriteLine($"PlayoutId:  {PlayoutId}");
+                Console.WriteLine($"timelineStart:  {timelineStart}");
+                Console.WriteLine($"editRate:  {editRate}");
+                Console.WriteLine($"timelineEditUnits:  {timelineEditUnits}");
+                Console.WriteLine($"resourceUrl:   {resourceUrl}");
+            }
 
             try
             {
@@ -104,18 +148,18 @@ namespace AcsListener
                 // Presumably the ACS has establisted 
 
                 NetworkStream stream = myClient.GetStream();
-                stream.WriteTimeout = timeoutValue;  // sets the timeout to X seconds
-                stream.ReadTimeout = timeoutValue;  // sets the  timeout to X seconds
+                stream.WriteTimeout = timeoutValue;  // sets the timeout to X milliseconds
+                stream.ReadTimeout = timeoutValue;  // sets the  timeout to X milliseconds
 
                 // Buffer for reading data
                 ProcessAnnounceRrp(stream);
                 ProcessGetNewLeaseRrp(stream, leaseSeconds);
                 ProcessGetStatusRrp(stream);
-                ProcessSetRplLocationRrp(stream, testResourceUrl, testPlayoutId);
+                ProcessSetRplLocationRrp(stream, resourceUrl, PlayoutId);
                 ProcessGetStatusRrp(stream);
-                ProcessUpdateTimelineRrp(stream, testPlayoutId, timelineStart);
+                ProcessUpdateTimelineRrp(stream, PlayoutId, timelineStart);
                 ProcessSetOutputModeRrp(stream, true);
-                ProcessUpdateTimelineRrp(stream, testPlayoutId, timelineEditUnits);
+                ProcessUpdateTimelineRrp(stream, PlayoutId, timelineEditUnits);
                 ProcessGetStatusRrp(stream);
 
                 SetLeaseTimer(stream, ((leaseSeconds * 1000) / 2));  // Convert to milliseconds and then halve the number
@@ -143,6 +187,47 @@ namespace AcsListener
                 }
             }
 
+        }
+
+        private static ResourcePresentationList LoadRplFromUrl(string rplUrlPath)
+        {
+            // Define the XmlSerializer casting to type SubtitleReel
+            XmlSerializer Deserializer = new XmlSerializer(typeof(ResourcePresentationList));
+            ResourcePresentationList XmlData;
+
+            // Open a new WebClient to get the data from the target URL
+            
+            WebClient client = new WebClient();
+
+            try
+            {
+                string data = Encoding.Default.GetString(client.DownloadData(rplUrlPath));
+
+                try
+                {
+                    Stream stream = new MemoryStream(Encoding.UTF8.GetBytes(data));
+
+                    // Deserialize the input file
+                    object DeserializedData = Deserializer.Deserialize(stream);
+
+                    // Cast the deserialized data to the SubtitleReel type
+                    XmlData = (ResourcePresentationList)DeserializedData;
+
+                    stream.Close();
+                }
+                finally
+                {
+                }
+            }
+            finally
+            {
+            }
+
+            // Close the input file stream
+            client.Dispose();
+
+            // Send the deserialized data pointer back to the calling routine
+            return XmlData;
         }
 
 

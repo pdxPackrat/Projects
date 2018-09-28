@@ -31,6 +31,9 @@ namespace SharedCommon
         [XmlElement("TimeCodeRate")]
         public int TimeCodeRate { get; set; }
 
+        [XmlElement("StartTime")]
+        public string StartTime { get; set; }
+
         [XmlElement("LoadFont")]
         public string LoadFont { get; set; }
 

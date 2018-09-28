@@ -11,8 +11,8 @@ namespace SharedCommon
         private UInt64 _editUnits;
         private UInt64 _rateNumerator;
         private UInt64 _rateDenominator;
-        private String _editRate;
-        private String _reelDuration;
+        // private String _editRate;
+        // private String _reelDuration;
         private uint _hours;
         private uint _minutes;
         private uint _seconds;
