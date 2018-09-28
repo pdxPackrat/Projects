@@ -80,6 +80,7 @@ namespace AcsListener
                 {
                     // Perform a blocking call to accept requests.
                     client = listener.AcceptTcpClient();
+
                     Console.WriteLine("[MasterThread]: TcpClient Accepted, assigning child thread");
 
                     // Set ListenerProcessParams for passing to the downstream process
@@ -102,11 +103,16 @@ namespace AcsListener
 
         }
 
+        /// <summary>
+        /// ListenerProcess is responsible handling most of the work of the AcsListener.  When a TCP connection is made, 
+        /// the main thread spawns off a child thread (via the ThreadPool) to ListenerProcess.  
+        /// </summary>
+        /// <param name="obj">A generic object containing data of type ListenerProcessParams</param>
         static void ListenerProcess(object obj)
         {
             const int timeoutValue = 10000;
-            // int numberOfBytes = 0;
             uint leaseSeconds = 60;
+            // int numberOfBytes = 0;
             // UInt32 testPlayoutId = 49520318;
             // UInt64 timelineStart = 0;
             // UInt64 timelineEditUnits = 14400;  // 24 (edit units per second) * 60 (seconds) * 10 (minutes)
