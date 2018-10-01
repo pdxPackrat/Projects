@@ -43,6 +43,8 @@ namespace AcsListener
     class Program
     {
         private static AcspLeaseTimer leaseTimer;
+        private static ManualResetEvent CanWriteToStream = new ManualResetEvent(true);
+        private static NetworkStream stream;
 
         static UInt32 currentRequestId = 0; // Tracks the current RequestID number that has been sent to the ACS
         static bool debugOutput = false;
@@ -149,31 +151,36 @@ namespace AcsListener
             {
                 IPEndPoint remoteEnd = (IPEndPoint)myClient.Client.RemoteEndPoint;
                 IPAddress remoteAddress = remoteEnd.Address;
+                
                 Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Connection Established! RemoteIP: {remoteAddress}");
 
                 // Presumably the ACS has establisted 
 
-                NetworkStream stream = myClient.GetStream();
+                if (stream is null)
+                {
+                    stream = myClient.GetStream();
+                }
+
                 stream.WriteTimeout = timeoutValue;  // sets the timeout to X milliseconds
                 stream.ReadTimeout = timeoutValue;  // sets the  timeout to X milliseconds
 
                 // Buffer for reading data
-                ProcessAnnounceRrp(stream);
-                ProcessGetNewLeaseRrp(stream, leaseSeconds);
-                ProcessGetStatusRrp(stream);
-                ProcessSetRplLocationRrp(stream, resourceUrl, PlayoutId);
-                ProcessGetStatusRrp(stream);
-                ProcessUpdateTimelineRrp(stream, PlayoutId, timelineStart);
-                ProcessSetOutputModeRrp(stream, true);
-                ProcessUpdateTimelineRrp(stream, PlayoutId, timelineEditUnits);
-                ProcessGetStatusRrp(stream);
+                ProcessAnnounceRrp();
+                ProcessGetNewLeaseRrp(leaseSeconds);
+                ProcessGetStatusRrp();
+                ProcessSetRplLocationRrp(resourceUrl, PlayoutId);
+                ProcessGetStatusRrp();
+                ProcessUpdateTimelineRrp(PlayoutId, timelineStart);
+                ProcessSetOutputModeRrp(true);
+                ProcessUpdateTimelineRrp(PlayoutId, timelineEditUnits);
+                ProcessGetStatusRrp();
 
-                SetLeaseTimer(stream, ((leaseSeconds * 1000) / 2));  // Convert to milliseconds and then halve the number
+                SetLeaseTimer((leaseSeconds * 1000) / 2);  // Convert to milliseconds and then halve the number
 
                 Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Will wait here until you press a key to exit this thread");
                 Console.ReadLine();
 
-                ProcessTerminateLease(stream);
+                ProcessTerminateLease();
 
             }
             catch (IOException ex)
@@ -241,7 +248,7 @@ namespace AcsListener
         /// Sets Custom AcspLeaseTimer object
         /// </summary>
         /// <param name="leaseTimerMsec">Number of milliseconds between each Elapsed event</param>
-        private static void SetLeaseTimer(NetworkStream stream, uint leaseTimerMsec)
+        private static void SetLeaseTimer(uint leaseTimerMsec)
         {
             Thread thread = Thread.CurrentThread;
             leaseTimer = new AcspLeaseTimer(stream, leaseTimerMsec);
@@ -256,16 +263,25 @@ namespace AcsListener
         {
             NetworkStream leaseStream = ((AcspLeaseTimer)sender).Stream;
 
-            ProcessGetStatusRrp(leaseStream);
+            ProcessGetStatusRrp();
         }
 
-        private static void ProcessAnnounceRrp(NetworkStream stream)
+        private static void ProcessAnnounceRrp()
         {
             Thread thread = Thread.CurrentThread;
             const int timeoutValue = 10000;
             int numberOfBytes;
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
+
+            if (debugOutput is true)
+            {
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+            }
+
+            CanWriteToStream.WaitOne();
+            CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
             bool announcePairSuccessful = false;
             while (announcePairSuccessful == false)
             {
@@ -326,17 +342,28 @@ namespace AcsListener
                     }  // if (stream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             }  // end while(annnouncePairSuccessful == false) loop
+
+            CanWriteToStream.Set();  // Signal all other processes that they can write to the stream now
         }
 
-        private static void ProcessGetNewLeaseRrp(NetworkStream stream, uint leaseSeconds)
+        private static void ProcessGetNewLeaseRrp(uint leaseSeconds)
         {
             Thread thread = Thread.CurrentThread;
             const int timeoutValue = 10000;
             int numberOfBytes;
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
-            bool messagePairSuccessful = false;
 
+
+            if (debugOutput is true)
+            {
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+            }
+
+            CanWriteToStream.WaitOne();
+            CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
 
@@ -400,20 +427,30 @@ namespace AcsListener
                     }  // if (stream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
 
-            }
+            }  // end while(messagePairSuccessful == false)
+
+            CanWriteToStream.Set();  // Signal that it is okay to write to the NetworkStream
 
         }  // end ProcessGetNewLeaseRrp()
 
 
-        private static void ProcessGetStatusRrp(NetworkStream stream)
+        private static void ProcessGetStatusRrp()
         {
             Thread thread = Thread.CurrentThread;
             const int timeoutValue = 10000;
             int numberOfBytes;
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
-            bool messagePairSuccessful = false;
 
+            if (debugOutput is true)
+            {
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+            }
+
+            CanWriteToStream.WaitOne();
+            CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
 
@@ -478,9 +515,11 @@ namespace AcsListener
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
 
+            CanWriteToStream.Set();  // Set signal to indicate that it is safe to write to the NetworkStream
+
         }  // end ProcessGetStatusRrp()
 
-        private static void ProcessSetRplLocationRrp(NetworkStream stream, string resourceUrl, UInt32 playoutId)
+        private static void ProcessSetRplLocationRrp(string resourceUrl, UInt32 playoutId)
         {
 
             Thread thread = Thread.CurrentThread;
@@ -488,8 +527,17 @@ namespace AcsListener
             int numberOfBytes;
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
-            bool messagePairSuccessful = false;
 
+
+            if (debugOutput is true)
+            {
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+            }
+
+            CanWriteToStream.WaitOne();
+            CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
                 // Send the "SetRplLocationRequest " to the ACS system
@@ -554,10 +602,11 @@ namespace AcsListener
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
 
+            CanWriteToStream.Set();
 
         }  // end ProcessSetRplLocationRrp()
 
-        private static void ProcessSetOutputModeRrp(NetworkStream stream, bool outputMode)
+        private static void ProcessSetOutputModeRrp(bool outputMode)
         {
 
             Thread thread = Thread.CurrentThread;
@@ -565,8 +614,17 @@ namespace AcsListener
             int numberOfBytes;
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
-            bool messagePairSuccessful = false;
 
+
+            if (debugOutput is true)
+            {
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+            }
+
+            CanWriteToStream.WaitOne();
+            CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
                 // Send the "SetOutputModeRequest " to the ACS system
@@ -630,18 +688,28 @@ namespace AcsListener
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
 
+            CanWriteToStream.Set();  // Signal that it is okay to write to the NetworkStream again
 
         }  // end ProcessSetRplLocationRrp(
 
-        private static void ProcessUpdateTimelineRrp(NetworkStream stream, UInt32 testPlayoutId, UInt64 timelineEditUnits)
+        private static void ProcessUpdateTimelineRrp(UInt32 testPlayoutId, UInt64 timelineEditUnits)
         {
             Thread thread = Thread.CurrentThread;
             const int timeoutValue = 10000;
             int numberOfBytes;
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
-            bool messagePairSuccessful = false;
 
+
+            if (debugOutput is true)
+            {
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+            }
+
+            CanWriteToStream.WaitOne();
+            CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
                 // Send the "UpdateTimeline Request " to the ACS system
@@ -704,18 +772,30 @@ namespace AcsListener
                     }  // if (stream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
+
+            CanWriteToStream.Set(); // Signal that it is okay to write to the NetworkStream again
+
         }   // end ProcessUpdateTimelineRrp()
 
 
-        private static void ProcessTerminateLease(NetworkStream stream)
+        private static void ProcessTerminateLease()
         {
             Thread thread = Thread.CurrentThread;
             const int timeoutValue = 10000;
             int numberOfBytes;
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
-            bool messagePairSuccessful = false;
 
+
+            if (debugOutput is true)
+            {
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+            }
+
+            CanWriteToStream.WaitOne();
+            CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
                 // Send the "TerminateLease Request " to the ACS system
@@ -778,6 +858,9 @@ namespace AcsListener
                     }  // if (stream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
+
+            CanWriteToStream.Set();  // Signal that it is okay to write to the NetworkStream again
+
         }  // end ProcessTerminateLease()
     }
 }
