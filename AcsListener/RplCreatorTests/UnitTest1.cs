@@ -26,7 +26,7 @@ namespace RplCreatorTests
         [TestMethod]
         public void TestRplReelDurationConstructor()
         {
-            RplReelDuration duration = new RplReelDuration("24 1", "01:35:00");
+            RplReelDuration duration = new RplReelDuration("01:35:00", "24 1");
 
             Assert.AreEqual((UInt64)136800, duration.EditUnits);
         }
@@ -43,9 +43,8 @@ namespace RplCreatorTests
         [TestMethod]
         public void TestRplReelDurationWithZeroes()
         {
-            RplReelDuration duration = new RplReelDuration("25 1", "00:00:00:00");
+            RplReelDuration duration = new RplReelDuration("00:00:00:00", "25 1");
             Assert.AreEqual((UInt64)0, duration.EditUnits);
-
         }
     }
 }

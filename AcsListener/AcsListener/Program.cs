@@ -23,10 +23,10 @@ namespace AcsListener
         [Option('d', "debug", Required = false, HelpText = "Use for debugging purposes - provides more verbose output")]
         public bool DebugOutput { get; set; }
 
-        [Option('r', "rplUrl", Required = true, HelpText = "Specify an RPL URL which may include either full URL with IP address (not localhost) or relative location, example: /CaptiView/rpl_test1.xml")]
+        [Option('r', "rplUrl", Required = false, HelpText = "Specify an RPL URL which may include either full URL with IP address (not localhost) or relative location, example: /CaptiView/rpl_test1.xml")]
         public string RplUrl { get; set; }
 
-        [Option('o', "offset", Required = false, HelpText = "Playtime offset in form of -o HH:MM:SS, -o HH:MM, or -o MM")]
+        [Option('o', "offset", Required = false, HelpText = "Playtime offset in form of -o HH:MM:SS, -o MM:SS, or -o MM")]
         public string PlaytimeOffset
         {
             get
@@ -42,12 +42,37 @@ namespace AcsListener
 
     class Program
     {
+        #region StaticData
+        static readonly Int32 acsPort = 4170;  // Per SMPTE 430-10:2010 specifications
+        static readonly Int32 commandPort = 13000;  // Arbitrary port choice
+
         private static AcspLeaseTimer leaseTimer;
-        private static ManualResetEvent CanWriteToStream = new ManualResetEvent(true);
+        private static ManualResetEvent CanWriteToStream = new ManualResetEvent(false);
+        private static bool ConnectedToAcs = false;
         private static NetworkStream stream;
+        private static TcpClient ListenerClient;
 
         static UInt32 currentRequestId = 0; // Tracks the current RequestID number that has been sent to the ACS
         static bool debugOutput = false;
+
+        // This next section represents static data that is stored at time of an RPL load action.  This should eventually
+        // be moved to a static class to give greater control over how the data is set/read
+
+        static UInt32 RplPlayoutId = 0;
+        static UInt64 RplTimelineOffset = 0;    // Probably won't be used in our implementation but see 430-10:2010, page 6 section 6.3.2.1 for more information
+        static string RplEditRate = "";
+        static string RplResourceUrl = "";
+
+
+    
+        
+        // Don't need this section anymore as these command line parameters have been obsoleted and shifted over to the command telnet connection
+        /*
+        static String rplUrl;
+        static String timeOffset;
+        */
+
+        #endregion StaticData
 
         static void Main(string[] args)
         {
@@ -61,21 +86,42 @@ namespace AcsListener
         {
             debugOutput = options.DebugOutput;
 
+            // Don't need this section anymore as these command line parameters have been obsoleted and shifted over to the command telnet connection
+            /*
+            rplUrl = options.RplUrl;
+            timeOffset = options.PlaytimeOffset;
+            */
+
             // Set the TcpListener to listen on port 4170 (per SMPTE 430-10:2010 specifications)
-            Int32 port = 4170;
+
             // IPAddress localAddress = IPAddress.Parse("127.0.0.1");
 
             IPAddress localAddress = IPAddress.Any;
 
-            // TcpListener = new TcpListener(IPAddress.Any, Port);
-            TcpListener listener = new TcpListener(localAddress, port);
+            TcpListener listenerAcs = new TcpListener(localAddress, acsPort);
+            TcpListener listenerCommand = new TcpListener(localAddress, commandPort);
 
-            TcpClient client;
-
-            listener.Start();
+            listenerAcs.Start();
+            listenerCommand.Start();
             Console.WriteLine("[MasterThread]: Initial configuration completed - starting network listener");
             Console.WriteLine("[MasterThread]: Waiting for a connection ... ");
 
+
+            try
+            {
+                // Perform a non-blocking call to accept requests on both the ACS and Command ports
+                listenerAcs.BeginAcceptTcpClient(OnAccept, listenerAcs);
+                listenerCommand.BeginAcceptTcpClient(OnAccept, listenerCommand);
+            }
+            finally
+            {
+                while (true)
+                {
+                    // go in to perpetual waiting loop here at the end, doing nothing but hanging out allowing the above try-block to do its thing
+                }
+            }
+
+            /* Temporary commenting until I can confirm the changes worked
             try
             {
                 while (true)
@@ -98,12 +144,415 @@ namespace AcsListener
                 Console.WriteLine("\nHit enter to continue...");
                 Console.Read();
             }
+            */
         }
 
         static void HandleParseError(IEnumerable<Error> errs)
         {
 
         }
+
+        static private void OnAccept(IAsyncResult res)
+        {
+            TcpListener listener = (TcpListener)res.AsyncState;
+            TcpClient client = listener.EndAcceptTcpClient(res);
+
+            IPEndPoint remoteEnd = (IPEndPoint)client.Client.RemoteEndPoint;
+            IPEndPoint localEnd = (IPEndPoint)client.Client.LocalEndPoint;
+            IPAddress remoteAddress = remoteEnd.Address;
+            IPAddress localAddress = localEnd.Address;
+            Int32 remoteEndPort = remoteEnd.Port;
+            Int32 localEndPort = localEnd.Port;
+
+            Thread thread = Thread.CurrentThread;
+
+            Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Connection Established! ");
+            Console.WriteLine($"   RemoteIP: {remoteAddress}, RemotePort: {remoteEnd.Port}, ");
+            Console.WriteLine($"   LocalIP: {localAddress}, LocalPort: {localEnd.Port}");
+
+            ListenerProcessParams processParams = new ListenerProcessParams(client);
+
+            if (localEndPort == acsPort)
+            {
+                ThreadPool.QueueUserWorkItem(ListenerProcess, processParams);
+            }
+            
+            if (localEndPort == commandPort)
+            {
+                ThreadPool.QueueUserWorkItem(CommandProcess, processParams);
+            }
+
+            // Regardless of which thread we spawn, we need to reset the TcpListener so that it is ready to accept another
+            // TCP connection on that port
+
+            listener.BeginAcceptTcpClient(OnAccept, listener);
+        }
+
+        static void CommandProcess(object obj)
+        {
+            var myParams = (ListenerProcessParams)obj;
+            TcpClient CommandClient = myParams.Client;
+            Thread thread = Thread.CurrentThread;
+
+            try
+            {
+                // Buffer for reading data
+                Byte[] bytes = new byte[512];
+                String data = null;       // the data received from the listener
+                String CommandInput = ""; // the parsed command received
+                bool Listening = true;    // controls the while-loop logic
+
+                // Enter the listening loop.
+                while (Listening == true)
+                {
+                    // Get a stream object for reading and writing
+
+                    NetworkStream commandStream = CommandClient.GetStream();
+                    String CommandGreeting = "COMMAND CONNECTION: WAITING FOR COMMAND INPUT\r\n";
+
+                    if (ConnectedToAcs)
+                    {
+                        CommandGreeting = CommandGreeting + "( ACS connected ): ";
+                    }
+                    else
+                    {
+                        CommandGreeting = CommandGreeting + "( ACS disconnected ): ";
+                    }
+
+                    // Send back a response 
+                    byte[] msg = System.Text.Encoding.ASCII.GetBytes(CommandGreeting);
+                    commandStream.Write(msg, 0, msg.Length);
+
+                    // Prepare for looping
+                    data = null;
+                    int i;
+                    bool CancelCommandReceived = false;   // used to control the while-loop logic (and when to quit)
+                    
+                    // loop to receive all of the data sent by the client
+                    while ((CancelCommandReceived == false) && ((i = commandStream.Read(bytes, 0, bytes.Length)) != 0))
+                    {
+                        // Translate the data bytes in to an ASCII string
+                        data = System.Text.Encoding.ASCII.GetString(bytes, 0, i);
+
+                        if (data == "\u0003") // checking for a CTRL+C from the connected terminal
+                        {
+                            CancelCommandReceived = true;   // set boolean logic to exit the while-loop
+                            Console.WriteLine("Received Cancel Command");
+                        }
+                        else
+                        {
+                            // Process the data sent by the client
+
+                            // If the data segment received is a CRLF, then take whatever parsed command so far and process it
+                            if (data == "\r\n")
+                            {
+                                // check first if it is one of the CANCEL/QUIT commands
+                                if (CommandInput.ToUpper() == "CANCEL" || CommandInput.ToUpper() == "QUIT" || CommandInput.ToUpper() == "EXIT")
+                                {
+                                    Console.WriteLine($"Thread #{thread.ManagedThreadId}: CANCEL/QUIT command received - terminating connection");
+                                    CancelCommandReceived = true;
+                                }
+                                else  // Begin the section that parses for one of the main commands
+                                {
+                                    // List of available commands that we can take:
+                                    // STATUS - returns output to the connected user indicating whether ACS is connected or not
+                                    //          and is the only command that can be used when not connected to the ACS
+                                    // LOAD   - in form of LOAD "FullyQualifiedUrlPath", loads an RPL and informs connected ACS
+                                    // STOP   - unloads the RPL from the connected ACS (and presumably would terminate the lease?)
+                                    // PLAY   - sets the OutputModeRrp to "true"
+                                    // PAUSE  - sets the OutputModeRrp to "false"
+                                    // TIME   - calls UpdateTimelineRrp with a calculated edit units based on a parameter in HH:MM:SS, MM:SS, or MM format
+
+                                    var CommandSplit = CommandInput.Split(' ');
+                                    string CommandBase = CommandSplit[0];
+                                    string CommandParameter = ""; 
+                                    String commandOutput = "";  // Any output returned from the processed command
+
+                                    if (CommandSplit.Length >= 2) // at least one parameter was passed in with this command - we only accept the first parameter at the moment
+                                    {
+                                        CommandParameter = CommandSplit[1];
+                                    }
+
+                                    // Output the command details to the AcsListener console
+                                    Console.WriteLine($"Thread #{thread.ManagedThreadId}:  Command Received:  {CommandBase.ToUpper()} {CommandParameter}");
+
+                                    if (ConnectedToAcs is true)
+                                    {
+                                        // Start processing based on which command was received
+                                        switch (CommandBase.ToUpper())
+                                        {
+                                            case "STATUS":
+                                                commandOutput = DoCommandStatus();
+                                                break;
+
+                                            case "LOAD":
+                                                if (CommandParameter == "")
+                                                {
+                                                    commandOutput = "LOAD command requires a parameter in format of LOAD \"FullyQualifiedUrlPath\"";
+                                                }
+                                                else
+                                                {
+                                                    string UrlPath = CommandParameter;
+                                                    commandOutput = DoCommandLoad(UrlPath);
+                                                    // commandOutput = "STUB holder for DoCommandLoad";
+                                                }
+                                                break;
+
+                                            case "STOP":
+                                                commandOutput = DoCommandStop();
+                                                commandOutput = "STUB holder for DoCommandStop";
+                                                break;
+
+                                            case "PLAY":
+                                                commandOutput = DoCommandPlay();
+                                                // commandOutput = "STUB holder for DoCommandPlay";
+                                                break;
+
+                                            case "PAUSE":
+                                                commandOutput = DoCommandPause();
+                                                // commandOutput = "STUB holder for DoCommandPause";
+                                                break;
+
+                                            case "TIME":
+                                                if (CommandParameter == "")
+                                                {
+                                                    commandOutput = "TIME command requires a parameter in format of TIME <parameter>, where parameter is either HH:MM:SS, MM:SS, or MM";
+                                                }
+                                                else
+                                                {
+                                                    // See below - forcing a 25/1 edit rate for now, but eventually we need logic that handles pulling that info from the loaded RPL
+
+                                                    if ((RplPlayoutId != 0) && (RplEditRate != ""))
+                                                    {
+                                                        // Some basic validation on our part here to make sure that the RPL has been loaded first
+                                                        string timeOffsetInput = CommandParameter;
+                                                        commandOutput = DoCommandTime(timeOffsetInput, RplEditRate);   // For now, forcing a 25/1 edit rate
+                                                    }
+                                                    else
+                                                    {
+                                                        commandOutput = "TIME command can only be used after a successful LOAD command has been issued";
+                                                    }
+                                                }
+                                                break;
+                                        }
+                                    }
+                                    else if ((ConnectedToAcs is false) && (CommandBase.ToUpper() == "STATUS"))
+                                    {
+                                        // the only command allowed when not connected to the ACS is "STATUS"
+                                        commandOutput = DoCommandStatus();
+                                    }
+
+
+                                    // If the command resulted in any kind of output, then add CRLF to it for proper formatting
+                                    if (commandOutput != "")
+                                    {
+                                        commandOutput = commandOutput + "\r\n";  // Add a CRLF to the end of the output message so that it is nicely formatted for the other side
+                                    }
+
+                                    if (ConnectedToAcs is true)
+                                    {
+                                        commandOutput = commandOutput + "( ACS connected ): ";
+                                    }
+                                    else
+                                    {
+                                        commandOutput = commandOutput + "( ACS disconnected ): ";
+                                    }
+
+                                    msg = System.Text.Encoding.ASCII.GetBytes(commandOutput);
+                                    commandStream.Write(msg, 0, msg.Length);
+                                    commandOutput = "";
+                                }
+
+                                CommandInput = "";
+                            }
+                            else
+                            {
+                                // Concatenate the input to the command string and continue
+                                CommandInput = String.Concat(CommandInput, data);
+                            }
+                        }
+                    }
+
+                    CommandClient.Close();
+                    CommandClient.Dispose();
+                    Listening = false;
+                }
+
+            }
+            catch (SocketException e)
+            {
+                Console.WriteLine($"SocketException: {e}");
+            }
+            finally
+            {
+                // Stop listening for new clients
+
+                if (CommandClient != null)
+                {
+                    CommandClient.Close();
+                    CommandClient.Dispose();
+                }
+
+                Console.WriteLine($"Thread #{thread.ManagedThreadId}: Connection Terminated");
+
+            }
+
+
+        }
+
+        private static string DoCommandStop()
+        {
+            // Well firstly we need to decide what exactly a STOP command does.  
+            // My thought is that it would clear all the static Rpl-related variables, perform a STOP, and then terminate the ACS lease
+
+            ClearRplStatics();
+            ProcessSetOutputModeRrp(false);
+            ProcessTerminateLease();
+
+            // The moment that the TerminateLease happens, we need to terminate the AcsConnection
+            // because it is going to IMMEDIATELY try to re-establish a connection to the DCS
+
+            return "STOP action successfully completed.  Output has been paused, and the ACS lease terminated.";
+        }
+
+        private static void ClearRplStatics()
+        {
+            RplPlayoutId = 0;
+            RplEditRate = "";
+            RplResourceUrl = "";
+            RplTimelineOffset = 0;
+        }
+
+        private static string DoCommandTime(string timeOffsetInput, string editRateInput)
+        {
+            // First, we need to construct an RplReelDuration from the timeOffsetInput that was passed to us.  
+            // In this version of DoCommandTime, we are (for now) assuming an editRateInput of "25 1" passed in
+            // but eventually we will get this information from the loaded RPL file
+
+            RplReelDuration reelDuration = new RplReelDuration(timeOffsetInput, editRateInput);
+            UInt64 updatedEditUnits = reelDuration.EditUnits;
+            string outputMessage = "";
+            
+            if (RplPlayoutId != 0)
+            {
+                // Some basic validation that we have a successfully loaded RPL
+                ProcessUpdateTimelineRrp(RplPlayoutId, updatedEditUnits);
+                outputMessage = "TIME command issued with:\r\n" + " Time: " + timeOffsetInput + "\r\n EditRate: " + editRateInput + "\r\n EditUnits: " + updatedEditUnits;
+            }
+            else
+            {
+                outputMessage = "Error:  Attempted a DoCommandTime call without a properly loaded RPL file first";
+            }
+
+            return outputMessage;
+        }
+
+        private static string DoCommandPause()
+        {
+            String outputMessage = "";
+            // Need some additional logic here to handle whether an RPL has already been loaded or not
+
+            // check to make sure that the NetworkStream is already set by the initial connection
+            if ((ConnectedToAcs is true) && (stream != null))
+            {
+                // For now we assume this succeeds, but eventually we need additional logic to detect whether this succeeds or not
+                ProcessSetOutputModeRrp(false);
+                outputMessage = "ACS instructed to set OutputMode to FALSE";
+            }
+            else
+            {
+                outputMessage = "ACS is not currently connected";
+            }
+
+            return outputMessage;
+        }
+
+        private static string DoCommandPlay()
+        {
+            String outputMessage = "";
+            // Need some additional logic here to handle whether an RPL has already been loaded or not
+
+            // check to make sure that the NetworkStream is already set by the initial connection
+            if ((ConnectedToAcs is true) && (stream != null))
+            {
+                // For now we assume this succeeds, but eventually we need additional logic to detect whether this succeeds or not
+                ProcessSetOutputModeRrp(true);
+                outputMessage = "ACS instructed to set OutputMode to TRUE";
+            }
+            else
+            {
+                outputMessage = "ACS is not currently connected";
+            }
+
+            return outputMessage;
+        }
+
+        private static string DoCommandStatus()
+        {
+            string result;
+
+            if (ConnectedToAcs is true)
+            {
+                result = "ACS is currently connected";
+            }
+            else
+            {
+                result = "ACS is NOT connected";
+            }
+
+            return result;
+        }
+
+        private static string DoCommandLoad(string rplUrlPath)
+        {
+
+            // Need some kind of URL / file validation present here prior to the XmlData load
+
+            ResourcePresentationList XmlData = LoadRplFromUrl(rplUrlPath);
+
+            // Set the static data first, that is needed by the other commands
+
+            if (XmlData.PlayoutId > 0)  // basically checking for a valid data load here
+            {
+                RplPlayoutId = XmlData.PlayoutId;
+            }
+            else
+            {
+                return "Error:  RPL file was not loaded correctly.   PlayoutId is not a valid value";
+            }
+
+            RplTimelineOffset = XmlData.ReelResources.TimelineOffset;
+            RplEditRate = XmlData.ReelResources.EditRate;
+            RplResourceUrl = rplUrlPath;
+
+            RplReelDuration startingTimeline = new RplReelDuration("00:00:00", RplEditRate);
+            UInt64 timelineEditUnits = startingTimeline.EditUnits;  // Should be 0 in the current iteration
+
+            // Need to set the RPL Location
+            ProcessSetRplLocationRrp(RplResourceUrl, RplPlayoutId);
+            ProcessGetStatusRrp();
+
+            // Need to set initial timeline here on a LOAD (presumably with a 0 timeline)
+            ProcessUpdateTimelineRrp(RplPlayoutId, timelineEditUnits);
+            ProcessGetStatusRrp();
+
+
+            // Really need some error-checking in the above Process{...} stuff so that we have some way to tell if it went wrong
+
+            Console.WriteLine($"LOAD command issued successfully.");
+            if (debugOutput is true)
+            {
+                Console.WriteLine($"PlayoutId:  {RplPlayoutId}");
+                Console.WriteLine($"timelineStart:  {RplTimelineOffset}");
+                Console.WriteLine($"editRate:  {RplEditRate}");
+                Console.WriteLine($"timelineEditUnits:  {timelineEditUnits}");
+                Console.WriteLine($"resourceUrl:   {RplResourceUrl}");
+            }
+
+            return "LOAD command issued successfully for: " + RplResourceUrl;
+        }
+
+
 
         /// <summary>
         /// ListenerProcess is responsible handling most of the work of the AcsListener.  When a TCP connection is made, 
@@ -122,19 +571,47 @@ namespace AcsListener
             // string testResourceUrl = "http://192.168.9.88/CaptiView/rpl_test1.xml";
 
             var myParams = (ListenerProcessParams)obj;
-            TcpClient myClient = myParams.Client;
-            String rplUrlPath = myParams.UrlPath;
-            String timeOffset = myParams.TimeOffset;
+
+            if ((ListenerClient != null) && (ListenerClient.Connected))
+            {
+                // If the static ListenerClient is already connected in another thread then we need to do the following:
+                //    1) Check the signal to make sure that no other thread is trying to write to the stream right now
+                //    2) Lock the signal so that no other thread tries to write
+                //    3) Close the existing stream
+                //    4) Close the existing TCP connection
+
+                CanWriteToStream.WaitOne();   // Wait to make sure no one else is trying to write to the NetworkStream
+                CanWriteToStream.Reset();     // Disable writing to the ACS NetworkStream for any other thread
+
+                if (stream != null)
+                {
+                    stream.Close();               // Close and dispose of the ACS NetworkStream
+                    stream = null;                // Null out the static ACS NetworkStream
+                }
+
+                ListenerClient.Close();           // Close the existing TCP connection
+
+            }
+
+            ListenerClient = myParams.Client;
+
+            /***  temporarily removed as these command-line options are no longer part of the design.  
+            String rplUrlPath = myParams.UrlPath;    // Needs to be fully-qualified URL that can be seen by the ACS system
+            String timeOffset = myParams.TimeOffset; // Time offset in the format of HH:MM:SS, MM:SS, or MM
+            */
+
             Thread thread = Thread.CurrentThread;
 
-            // This is presumably where the "LOAD" action's data would need to be taken from
 
+            // Need some kind of URL / file validation present here prior to the XmlData load
+            // This doesn't get done here anymore - it should get processed in DoCommandLoad() instead
+            /*
             ResourcePresentationList XmlData = LoadRplFromUrl(rplUrlPath);
 
             UInt32 PlayoutId = XmlData.PlayoutId;
             UInt64 timelineStart = XmlData.ReelResources.TimelineOffset;
             String editRate = XmlData.ReelResources.EditRate;
-            RplReelDuration duration = new RplReelDuration(editRate, timeOffset);
+            RplReelDuration duration = new RplReelDuration(timeOffset, editRate);
             UInt64 timelineEditUnits = duration.EditUnits;
             string resourceUrl = rplUrlPath;
 
@@ -146,34 +623,45 @@ namespace AcsListener
                 Console.WriteLine($"timelineEditUnits:  {timelineEditUnits}");
                 Console.WriteLine($"resourceUrl:   {resourceUrl}");
             }
+            */
 
             try
             {
-                IPEndPoint remoteEnd = (IPEndPoint)myClient.Client.RemoteEndPoint;
+                IPEndPoint remoteEnd = (IPEndPoint)ListenerClient.Client.RemoteEndPoint;
                 IPAddress remoteAddress = remoteEnd.Address;
                 
                 Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Connection Established! RemoteIP: {remoteAddress}");
+                ConnectedToAcs = true;   // set the static variable to true to let CommandProcess know if connection has occurred
 
                 // Presumably the ACS has establisted 
 
-                if (stream is null)
+                if (stream != null)
                 {
-                    stream = myClient.GetStream();
+                    // Check to see if stream hasn't been cleaned up properly since the last connection
+                    // If it hasn't, then we need to clean that up first
+
+                    stream.Close();
                 }
 
+                stream = ListenerClient.GetStream();
                 stream.WriteTimeout = timeoutValue;  // sets the timeout to X milliseconds
                 stream.ReadTimeout = timeoutValue;  // sets the  timeout to X milliseconds
+                CanWriteToStream.Set();             // Finally, set the signal to indicate that the NetworkStream can be written to by other threads
 
                 // Buffer for reading data
                 ProcessAnnounceRrp();
                 ProcessGetNewLeaseRrp(leaseSeconds);
                 ProcessGetStatusRrp();
-                ProcessSetRplLocationRrp(resourceUrl, PlayoutId);
-                ProcessGetStatusRrp();
-                ProcessUpdateTimelineRrp(PlayoutId, timelineStart);
-                ProcessSetOutputModeRrp(true);
-                ProcessUpdateTimelineRrp(PlayoutId, timelineEditUnits);
-                ProcessGetStatusRrp();
+
+                // No longer needed HERE in this implementation design, 
+                // will be done from CommandProcess() instead
+                // ProcessSetRplLocationRrp(resourceUrl, PlayoutId);
+                // ProcessGetStatusRrp();
+
+                // ProcessUpdateTimelineRrp(PlayoutId, timelineStart);
+                // ProcessSetOutputModeRrp(true);
+                // ProcessUpdateTimelineRrp(PlayoutId, timelineEditUnits);
+                // ProcessGetStatusRrp();
 
                 SetLeaseTimer((leaseSeconds * 1000) / 2);  // Convert to milliseconds and then halve the number
 
@@ -181,7 +669,8 @@ namespace AcsListener
                 Console.ReadLine();
 
                 ProcessTerminateLease();
-
+                
+                stream = null;   // Null set the NetworkStream object so that it is again available for next connection
             }
             catch (IOException ex)
             {
@@ -190,21 +679,60 @@ namespace AcsListener
             }
             finally
             {
-                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: closing network connection");
-                myClient.Close();
+                DoAcsConnectionCleanup();
 
-                if (leaseTimer != null)
-                {
-                    leaseTimer.Stop();
-                    leaseTimer.Dispose();
-                }
             }
 
         }
 
+        private static void DoAcsConnectionCleanup()
+        {
+            Thread thread = Thread.CurrentThread;
+
+            if (stream != null)
+            {
+                try
+                {
+                    Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Attempting to close the NetworkStream and close the overall ACS TCP connection");
+                    CanWriteToStream.WaitOne();
+                    CanWriteToStream.Reset();    // Block so that nothing else attempts to write to the stream
+                    stream.Close();
+                }
+                finally
+                {
+                    stream = null;
+                }
+            }
+
+            if (ListenerClient != null)
+            {
+                if (ListenerClient.Connected)
+                {
+                    try
+                    {
+                        Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: closing network connection");
+                        ListenerClient.Close();
+                    }
+                    finally
+                    {
+                        ListenerClient = null;
+                    }
+                }
+            }
+
+            if (leaseTimer != null)
+            {
+                leaseTimer.Stop();
+                leaseTimer.Dispose();
+                leaseTimer = null;
+            }
+
+            ConnectedToAcs = false;   // Set the flag to indicate that connection to/from the ACS has been terminated
+        }
+
         private static ResourcePresentationList LoadRplFromUrl(string rplUrlPath)
         {
-            // Define the XmlSerializer casting to type SubtitleReel
+            // Define the XmlSerializer casting to be of type ResourcePresentationList
             XmlSerializer Deserializer = new XmlSerializer(typeof(ResourcePresentationList));
             ResourcePresentationList XmlData;
 
@@ -261,7 +789,7 @@ namespace AcsListener
 
         private static void ProcessLeaseTimer(object sender, ElapsedEventArgs e)
         {
-            NetworkStream leaseStream = ((AcspLeaseTimer)sender).Stream;
+            NetworkStream leaseStream = ((AcspLeaseTimer)sender).Stream;   // leaseStream isn't used in this current version but not ready to obsolete it quite yet
 
             ProcessGetStatusRrp();
         }
@@ -690,7 +1218,7 @@ namespace AcsListener
 
             CanWriteToStream.Set();  // Signal that it is okay to write to the NetworkStream again
 
-        }  // end ProcessSetRplLocationRrp(
+        }  // end ProcessSetRplLocationRrp()
 
         private static void ProcessUpdateTimelineRrp(UInt32 testPlayoutId, UInt64 timelineEditUnits)
         {
@@ -859,8 +1387,11 @@ namespace AcsListener
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
 
-            CanWriteToStream.Set();  // Signal that it is okay to write to the NetworkStream again
+            CanWriteToStream.Set();     // The subsequent clean-up activity needs the signal set (as it safely waits for any other ACS write to finish first)
+            DoAcsConnectionCleanup();   // Do all the necessary stuff to clean up the network stream and close the TCP connection
 
+            // We don't need to do a CanWriteToStream.Set() here, since at this point at the end of the TerminateLease, we are assuming that the TCP connection is closed or closing
+            
         }  // end ProcessTerminateLease()
     }
 }

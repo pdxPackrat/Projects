@@ -116,7 +116,7 @@ namespace MyTcpListener
                             // If the data segment received is a CRLF, then take whatever parsed command so far and process it
                             if (data == "\r\n")
                             {
-                                if (command == "CANCEL" || command == "QUIT")
+                                if (command == "CANCEL" || command == "QUIT" || command == "EXIT")
                                 {
                                     Console.WriteLine($"Thread #{thread.ManagedThreadId}: CANCEL/QUIT command received - terminating connection");
                                     CancelCommandReceived = true;

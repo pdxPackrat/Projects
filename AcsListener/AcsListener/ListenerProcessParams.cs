@@ -12,8 +12,18 @@ namespace AcsListener
     public class ListenerProcessParams
     {
         private readonly TcpClient _client;
-        private readonly String _urlPath;
+        private readonly String _urlPath = "";
         private readonly String _timeOffset = "0";
+
+        public ListenerProcessParams(TcpClient inputClient)
+        {
+            if (inputClient is null)
+            {
+                throw new NullReferenceException("Error: inputClient cannot be NULL");
+            }
+
+            this._client = inputClient;
+        }
 
         public ListenerProcessParams(TcpClient inputClient, String inputUrlPath)
         {

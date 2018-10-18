@@ -16,8 +16,20 @@ namespace SharedCommon
         private uint _hours;
         private uint _minutes;
         private uint _seconds;
+        
+        /// <summary>
+        /// RplReelDuration class constructor that assumes a 25-1 edit rate
+        /// </summary>
+        /// <param name="reelDuration"></param>
+        public RplReelDuration(string reelDuration)
+        {
+            ParseEditRate("25 1");
+            ParseReelDuration(reelDuration);
+            CalculateEditUnits();
+        }
 
-        public RplReelDuration(string editRate, string reelDuration)
+
+        public RplReelDuration(string reelDuration, string editRate)
         {
             ParseEditRate(editRate);
             ParseReelDuration(reelDuration);
@@ -30,6 +42,10 @@ namespace SharedCommon
             _editUnits = ((TotalSeconds * _rateNumerator) / _rateDenominator);
         }
 
+        /// <summary>
+        /// Method designed to take one of three accepted formats of time code and parse out the data for the fields
+        /// </summary>
+        /// <param name="reelDuration">Accepted format of HH:MM:SS, MM:SS, or MM</param>
         private void ParseReelDuration(string reelDuration)
         {
             var DurationSplit = reelDuration.Split(':');
@@ -40,11 +56,11 @@ namespace SharedCommon
                 _minutes = uint.Parse(DurationSplit[1]);
                 _seconds = uint.Parse(DurationSplit[2]);
             }
-            else if (DurationSplit.Length == 2) // Presumably only HH:MM was supplied?
+            else if (DurationSplit.Length == 2) // Presumably only MM:SS was supplied?
             {
-                _hours = uint.Parse(DurationSplit[0]);
-                _minutes = uint.Parse(DurationSplit[1]);
-                _seconds = 0;
+                _hours = 0;
+                _minutes = uint.Parse(DurationSplit[0]);
+                _seconds = uint.Parse(DurationSplit[1]);
             }
             else if (DurationSplit.Length == 1) // Presumably only MM was supplied?
             {

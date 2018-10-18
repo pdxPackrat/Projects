@@ -52,7 +52,7 @@ namespace RplCreator
 
             if (options.ReelDuration != null)
             {
-                RplReelDuration duration = new RplReelDuration(Rpl.ReelResources.EditRate, options.ReelDuration);
+                RplReelDuration duration = new RplReelDuration(options.ReelDuration, Rpl.ReelResources.EditRate);
                 Rpl.ReelResources.ReelResource.Duration = duration.EditUnits;
             }
             else
@@ -73,8 +73,8 @@ namespace RplCreator
                     }
 
                     string output = hours.ToString() + ":" + minutes.ToString();
-                    RplReelDuration lastSubtitleDuration = new RplReelDuration(Rpl.ReelResources.EditRate, output);
-                    RplReelDuration startTimelineDuration = new RplReelDuration(Rpl.ReelResources.EditRate, XmlData.StartTime);
+                    RplReelDuration lastSubtitleDuration = new RplReelDuration(output, Rpl.ReelResources.EditRate);
+                    RplReelDuration startTimelineDuration = new RplReelDuration(XmlData.StartTime, Rpl.ReelResources.EditRate);
                     Rpl.ReelResources.ReelResource.Duration = lastSubtitleDuration.EditUnits - startTimelineDuration.EditUnits;
                 }
                 else
