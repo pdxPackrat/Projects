@@ -508,7 +508,27 @@ namespace AcsListener
 
             // Need some kind of URL / file validation present here prior to the XmlData load
 
-            ResourcePresentationList XmlData = LoadRplFromUrl(rplUrlPath);
+            ResourcePresentationList XmlData;
+            string outputMessage = "";
+                
+            try
+            {
+                XmlData = LoadRplFromUrl(rplUrlPath);
+            }
+            catch (ArgumentException ex)
+            {
+                outputMessage = "Error performing LOAD command: " + ex.Message;
+                return outputMessage;
+            }
+            catch (WebException ex)
+            {
+                outputMessage = "Error performing LOAD command: " + ex.Message;
+                return outputMessage;
+            }
+            finally
+            {
+
+            }
 
             // Set the static data first, that is needed by the other commands
 
