@@ -72,7 +72,7 @@ namespace RplCreator
                         hours++;
                     }
 
-                    string output = hours.ToString() + ":" + minutes.ToString();
+                    string output = hours.ToString() + ":" + minutes.ToString() + ":00";  // Needs to be in format of HH:MM:SS
                     RplReelDuration lastSubtitleDuration = new RplReelDuration(output, Rpl.ReelResources.EditRate);
                     RplReelDuration startTimelineDuration = new RplReelDuration(XmlData.StartTime, Rpl.ReelResources.EditRate);
                     Rpl.ReelResources.ReelResource.Duration = lastSubtitleDuration.EditUnits - startTimelineDuration.EditUnits;
