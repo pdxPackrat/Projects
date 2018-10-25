@@ -79,6 +79,8 @@
     <Compile Include="ListenerProcessParams.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RplLoadInformation.cs" />
+    <Compile Include="RplPlayoutData.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

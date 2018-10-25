@@ -58,10 +58,15 @@ namespace AcsListener
         // This next section represents static data that is stored at time of an RPL load action.  This should eventually
         // be moved to a static class to give greater control over how the data is set/read
 
+
+        static RplLoadInformation rplLoadInfo = new RplLoadInformation();
+
+        /*  Not sure we need this section anymore, I just need to keep it around long enough to rewrite the usage for the new rplLoadInfo model
         static UInt32 RplPlayoutId = 0;
         static UInt64 RplTimelineOffset = 0;    // Probably won't be used in our implementation but see 430-10:2010, page 6 section 6.3.2.1 for more information
         static string RplEditRate = "";
         static string RplResourceUrl = "";
+        */
 
 
     
@@ -255,6 +260,7 @@ namespace AcsListener
                                 else  // Begin the section that parses for one of the main commands
                                 {
                                     // List of available commands that we can take:
+                                    // HELP   - Shows all of the available commands
                                     // STATUS - returns output to the connected user indicating whether ACS is connected or not
                                     //          and is the only command that can be used when not connected to the ACS
                                     // LOAD   - in form of LOAD "FullyQualifiedUrlPath", loads an RPL and informs connected ACS
@@ -262,6 +268,10 @@ namespace AcsListener
                                     // PLAY   - sets the OutputModeRrp to "true"
                                     // PAUSE  - sets the OutputModeRrp to "false"
                                     // TIME   - calls UpdateTimelineRrp with a calculated edit units based on a parameter in HH:MM:SS, MM:SS, or MM format
+                                    // LIST   - outputs list of RPLs that have been LOADed, along with their index value
+                                    // SELECT - choose an RPL to be the "ACTIVE" RPL that is passed the various commands that require PlayoutId 
+                                    // UNLOAD - removes an RPL from the selection list.  Note there is no analogue to this on the ACS side.
+                                    // KILL   - Performs a STOP, and then terminates the lease
 
                                     var CommandSplit = CommandInput.Split(' ');
                                     string CommandBase = CommandSplit[0];
@@ -294,23 +304,19 @@ namespace AcsListener
                                                 {
                                                     string UrlPath = CommandParameter;
                                                     commandOutput = DoCommandLoad(UrlPath);
-                                                    // commandOutput = "STUB holder for DoCommandLoad";
                                                 }
                                                 break;
 
                                             case "STOP":
                                                 commandOutput = DoCommandStop();
-                                                commandOutput = "STUB holder for DoCommandStop";
                                                 break;
 
                                             case "PLAY":
                                                 commandOutput = DoCommandPlay();
-                                                // commandOutput = "STUB holder for DoCommandPlay";
                                                 break;
 
                                             case "PAUSE":
                                                 commandOutput = DoCommandPause();
-                                                // commandOutput = "STUB holder for DoCommandPause";
                                                 break;
 
                                             case "TIME":
@@ -320,26 +326,107 @@ namespace AcsListener
                                                 }
                                                 else
                                                 {
-                                                    // See below - forcing a 25/1 edit rate for now, but eventually we need logic that handles pulling that info from the loaded RPL
-
-                                                    if ((RplPlayoutId != 0) && (RplEditRate != ""))
+                                                    // Some basic validation on our part here to make sure that the RPL has been loaded first
+                                                    if (rplLoadInfo.IsPlayoutSelected is true)
                                                     {
-                                                        // Some basic validation on our part here to make sure that the RPL has been loaded first
-                                                        string timeOffsetInput = CommandParameter;
-                                                        commandOutput = DoCommandTime(timeOffsetInput, RplEditRate);   // For now, forcing a 25/1 edit rate
+                                                        RplPlayoutData playoutData = rplLoadInfo.GetPlayoutData();
+
+                                                        if (playoutData.EditRate != "")
+                                                        {
+                                                            string timeOffsetInput = CommandParameter;
+                                                            commandOutput = DoCommandTime(timeOffsetInput, playoutData.EditRate); 
+                                                        }
+                                                        else
+                                                        {
+                                                            commandOutput = "TIME command can only be used after a successful LOAD command has been issued";
+                                                        }
                                                     }
                                                     else
                                                     {
-                                                        commandOutput = "TIME command can only be used after a successful LOAD command has been issued";
+                                                        commandOutput = "TIME command cannot be used until an RPL is chosen by SELECT";
                                                     }
                                                 }
+                                                break;
+
+                                            case "LIST":
+                                                commandOutput = DoCommandList();
+                                                break;
+
+                                            // SELECT command requires single parameter (PlayoutId)
+                                            // and performs a DoCommandSelect(), checks for success, and then a DoCommandTime() with 0 timeline.
+                                            case "SELECT":
+                                                if (CommandParameter == "")
+                                                {
+                                                    commandOutput = "SELECT command requires a parameter in format of SELECT <parameter>, where parameter is the PlayoutId";
+                                                }
+                                                else
+                                                {
+                                                    UInt32 playoutId;
+                                                    try
+                                                    {
+                                                        playoutId = UInt32.Parse(CommandParameter);
+                                                        commandOutput = DoCommandSelect(playoutId);
+
+                                                        // Some basic validation on our part here to make sure that the RPL has been loaded first
+                                                        if (rplLoadInfo.IsPlayoutSelected is true)
+                                                        {
+                                                            RplPlayoutData playoutData = rplLoadInfo.GetPlayoutData();
+
+                                                            if (playoutData.EditRate != "")
+                                                            {
+                                                                // If we reached this point then we presumably have a good RPL, so send 
+                                                                // a UpdateTimeline request per SMPTE 430-10, which states that the RPL must be set first, 
+                                                                // then an UpdateTimeline sent, before any OutputMode can be set. 
+                                                                commandOutput = commandOutput + "\r\n" + DoCommandTime("00:00", playoutData.EditRate);
+                                                            }
+                                                            else
+                                                            {
+                                                                commandOutput = "Error: SELECT succeeded, but something is wrong with the Playout data.  EditRate is blank.";
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            commandOutput = "TIME command cannot be used until an RPL is chosen by SELECT";
+                                                        }
+
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        commandOutput = "Error: " + ex.Message;
+                                                    }
+                                                    finally
+                                                    {
+                                                    }
+                                                }
+                                                break;
+
+                                            case "UNLOAD":
+                                                commandOutput = "STUB for DoCommandUnload()";
+                                                break;
+
+                                            case "KILL":
+                                                commandOutput = "STUB for DoCommandKill()";
+                                                break;
+
+                                            case "HELP":
+                                                commandOutput = "STUB for DoCommandHelp()";
                                                 break;
                                         }
                                     }
                                     else if ((ConnectedToAcs is false) && (CommandBase.ToUpper() == "STATUS"))
                                     {
-                                        // the only command allowed when not connected to the ACS is "STATUS"
+                                        // the only functional command allowed when not connected to the ACS is "STATUS" 
                                         commandOutput = DoCommandStatus();
+                                    }
+                                    else if ((ConnectedToAcs is false) && (CommandBase.ToUpper() == "HELP"))
+                                    {
+                                        // the only other command allowed is "HELP"
+                                        commandOutput = "STUB for DoCommandHelp()";
+                                    }
+                                    else
+                                    {
+                                        // If we don't meet any of the above criteriaNotify the user that the command is not allowed
+                                        commandOutput = "The " + CommandBase.ToUpper() + " command is not recognized, or is not allowed in this mode";
                                     }
 
 
@@ -349,6 +436,7 @@ namespace AcsListener
                                         commandOutput = commandOutput + "\r\n";  // Add a CRLF to the end of the output message so that it is nicely formatted for the other side
                                     }
 
+                                    // Add a mode status output to the return string being sent to the command connection
                                     if (ConnectedToAcs is true)
                                     {
                                         commandOutput = commandOutput + "( ACS connected ): ";
@@ -400,43 +488,84 @@ namespace AcsListener
 
         }
 
+        private static string DoCommandSelect(UInt32 playoutId)
+        {
+            string outputMessage;
+
+            outputMessage = rplLoadInfo.SetCurrentPlayout(playoutId);
+
+            return outputMessage;
+        }
+
+        private static string DoCommandList()
+        {
+            string outputMessage;
+
+            if (ConnectedToAcs is true)
+            {
+                if (rplLoadInfo.LoadCount > 0)
+                {
+                    outputMessage = rplLoadInfo.GetRplLoadList();
+                }
+                else
+                {
+                    outputMessage = "LIST command cannot be performed until at least one RPL has been loaded";
+                }
+            }
+            else
+            {
+                outputMessage = "ACS not connected.  Cannot perform LIST command";
+            }
+
+            return outputMessage;
+        }
+
         private static string DoCommandStop()
         {
             // Well firstly we need to decide what exactly a STOP command does.  
             // My thought is that it would clear all the static Rpl-related variables, perform a STOP, and then terminate the ACS lease
 
-            ClearRplStatics();
-            ProcessSetOutputModeRrp(false);
-            ProcessTerminateLease();
-
-            // The moment that the TerminateLease happens, we need to terminate the AcsConnection
-            // because it is going to IMMEDIATELY try to re-establish a connection to the DCS
-
-            return "STOP action successfully completed.  Output has been paused, and the ACS lease terminated.";
+            if (rplLoadInfo.IsPlayoutSelected is true)
+            {
+                ProcessSetOutputModeRrp(false);
+                ClearRplStatics();
+                return "STOP action successfully completed.  ACS output has been paused, and the current PlayoutId has been cleared from memory";
+            }
+            else
+            {
+                return "STOP action cannot be executed, as there is no PlayoutId currently selected";
+            }
         }
 
         private static void ClearRplStatics()
         {
-            RplPlayoutId = 0;
-            RplEditRate = "";
-            RplResourceUrl = "";
-            RplTimelineOffset = 0;
+            rplLoadInfo.ClearCurrentPlayout();  // Sets the current PlayoutId to 0 and the IsPlayoutSelected will return false
         }
 
         private static string DoCommandTime(string timeOffsetInput, string editRateInput)
         {
+            string outputMessage = "";
+
+            // Check to make sure we have a connected ACS
+            if (ConnectedToAcs is false)
+            {
+                outputMessage = "TIME command cannot be issued while ACS is disconnected";
+                return outputMessage;
+            }
+
             // First, we need to construct an RplReelDuration from the timeOffsetInput that was passed to us.  
             // In this version of DoCommandTime, we are (for now) assuming an editRateInput of "25 1" passed in
             // but eventually we will get this information from the loaded RPL file
 
             RplReelDuration reelDuration = new RplReelDuration(timeOffsetInput, editRateInput);
             UInt64 updatedEditUnits = reelDuration.EditUnits;
-            string outputMessage = "";
             
-            if (RplPlayoutId != 0)
+
+            // Some basic validation that we have a successfully loaded RPL
+            if (rplLoadInfo.IsPlayoutSelected is true)
             {
-                // Some basic validation that we have a successfully loaded RPL
-                ProcessUpdateTimelineRrp(RplPlayoutId, updatedEditUnits);
+                RplPlayoutData playoutData = rplLoadInfo.GetPlayoutData();
+                ProcessUpdateTimelineRrp(playoutData.PlayoutId, updatedEditUnits);
                 outputMessage = "TIME command issued with:\r\n" + " Time: " + timeOffsetInput + "\r\n EditRate: " + editRateInput + "\r\n EditUnits: " + updatedEditUnits;
             }
             else
@@ -455,9 +584,21 @@ namespace AcsListener
             // check to make sure that the NetworkStream is already set by the initial connection
             if ((ConnectedToAcs is true) && (stream != null))
             {
-                // For now we assume this succeeds, but eventually we need additional logic to detect whether this succeeds or not
-                ProcessSetOutputModeRrp(false);
-                outputMessage = "ACS instructed to set OutputMode to FALSE";
+                // Check to make sure that we have a PlayoutId chosen by the SELECT command
+                // as per SMPTE 430-10, we must have already performed a SetRplLocation and an UpdateTimeline before we can set
+                // the OutputMode to TRUE. 
+
+                if (rplLoadInfo.IsPlayoutSelected is true)
+                {
+                    ProcessSetOutputModeRrp(false);
+                    outputMessage = "ACS instructed to set OutputMode to FALSE";
+                    // For now we assume this succeeds, but eventually we need additional logic to detect whether this succeeds or not
+                }
+                else
+                {
+                    outputMessage = "PAUSE is unsuccessful.  The SELECT command must be used first";
+                }
+
             }
             else
             {
@@ -475,9 +616,20 @@ namespace AcsListener
             // check to make sure that the NetworkStream is already set by the initial connection
             if ((ConnectedToAcs is true) && (stream != null))
             {
-                // For now we assume this succeeds, but eventually we need additional logic to detect whether this succeeds or not
-                ProcessSetOutputModeRrp(true);
-                outputMessage = "ACS instructed to set OutputMode to TRUE";
+                // Check to make sure that we have a PlayoutId chosen by the SELECT command
+                // as per SMPTE 430-10, we must have already performed a SetRplLocation and an UpdateTimeline before we can set
+                // the OutputMode to TRUE. 
+
+                if (rplLoadInfo.IsPlayoutSelected is true)
+                {
+                    ProcessSetOutputModeRrp(true);
+                    outputMessage = "ACS instructed to set OutputMode to TRUE";
+                    // For now we assume this succeeds, but eventually we need additional logic to detect whether this succeeds or not
+                }
+                else
+                {
+                    outputMessage = "PLAY is unsuccessful.  The SELECT command must be used first";
+                }
             }
             else
             {
@@ -532,44 +684,52 @@ namespace AcsListener
 
             // Set the static data first, that is needed by the other commands
 
-            if (XmlData.PlayoutId > 0)  // basically checking for a valid data load here
-            {
-                RplPlayoutId = XmlData.PlayoutId;
-            }
-            else
+            if (XmlData.PlayoutId == 0) // basically checking to make sure we didn't get an invalid load
             {
                 return "Error:  RPL file was not loaded correctly.   PlayoutId is not a valid value";
             }
 
-            RplTimelineOffset = XmlData.ReelResources.TimelineOffset;
-            RplEditRate = XmlData.ReelResources.EditRate;
-            RplResourceUrl = rplUrlPath;
+            RplPlayoutData playoutData = new RplPlayoutData();
 
-            RplReelDuration startingTimeline = new RplReelDuration("00:00:00", RplEditRate);
+            playoutData.PlayoutId = XmlData.PlayoutId;
+            playoutData.TimelineOffset = XmlData.ReelResources.TimelineOffset;
+            playoutData.EditRate = XmlData.ReelResources.EditRate;
+            playoutData.ResourceUrl = rplUrlPath;
+
+            RplReelDuration startingTimeline = new RplReelDuration("00:00:00", playoutData.EditRate);
             UInt64 timelineEditUnits = startingTimeline.EditUnits;  // Should be 0 in the current iteration
 
             // Need to set the RPL Location
-            ProcessSetRplLocationRrp(RplResourceUrl, RplPlayoutId);
+            ProcessSetRplLocationRrp(playoutData.ResourceUrl, playoutData.PlayoutId);
             ProcessGetStatusRrp();
 
-            // Need to set initial timeline here on a LOAD (presumably with a 0 timeline)
-            ProcessUpdateTimelineRrp(RplPlayoutId, timelineEditUnits);
-            ProcessGetStatusRrp();
-
-
-            // Really need some error-checking in the above Process{...} stuff so that we have some way to tell if it went wrong
+            // Special note here - this is just a LOAD action, not a SELECT, so no timeline update at this point
 
             Console.WriteLine($"LOAD command issued successfully.");
             if (debugOutput is true)
             {
-                Console.WriteLine($"PlayoutId:  {RplPlayoutId}");
-                Console.WriteLine($"timelineStart:  {RplTimelineOffset}");
-                Console.WriteLine($"editRate:  {RplEditRate}");
+                Console.WriteLine($"PlayoutId:  {playoutData.PlayoutId}");
+                Console.WriteLine($"timelineStart:  {playoutData.TimelineOffset}");
+                Console.WriteLine($"editRate:  {playoutData.EditRate}");
                 Console.WriteLine($"timelineEditUnits:  {timelineEditUnits}");
-                Console.WriteLine($"resourceUrl:   {RplResourceUrl}");
+                Console.WriteLine($"resourceUrl:   {playoutData.ResourceUrl}");
             }
 
-            return "LOAD command issued successfully for: " + RplResourceUrl;
+            try
+            {
+                rplLoadInfo.InsertRplData(playoutData);
+                outputMessage = "LOAD command issues successfully for: " + playoutData.ResourceUrl + "\r\n" + " PlayoutId #: " + playoutData.PlayoutId;
+            }
+            catch (ArgumentException ex)
+            {
+                outputMessage = ex.Message;
+            }
+            finally
+            {
+            }
+
+            return outputMessage;
+
         }
 
 
@@ -668,20 +828,10 @@ namespace AcsListener
                 stream.ReadTimeout = timeoutValue;  // sets the  timeout to X milliseconds
                 CanWriteToStream.Set();             // Finally, set the signal to indicate that the NetworkStream can be written to by other threads
 
-                // Buffer for reading data
+                // Announce to ACS and get response, set lease with ACS, and finally get status from ACS.  All other actions handled by command process
                 ProcessAnnounceRrp();
                 ProcessGetNewLeaseRrp(leaseSeconds);
                 ProcessGetStatusRrp();
-
-                // No longer needed HERE in this implementation design, 
-                // will be done from CommandProcess() instead
-                // ProcessSetRplLocationRrp(resourceUrl, PlayoutId);
-                // ProcessGetStatusRrp();
-
-                // ProcessUpdateTimelineRrp(PlayoutId, timelineStart);
-                // ProcessSetOutputModeRrp(true);
-                // ProcessUpdateTimelineRrp(PlayoutId, timelineEditUnits);
-                // ProcessGetStatusRrp();
 
                 SetLeaseTimer((leaseSeconds * 1000) / 2);  // Convert to milliseconds and then halve the number
 
