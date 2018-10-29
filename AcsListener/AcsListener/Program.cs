@@ -365,7 +365,18 @@ namespace AcsListener
                                                     try
                                                     {
                                                         playoutId = UInt32.Parse(CommandParameter);
-                                                        commandOutput = DoCommandSelect(playoutId);
+
+                                                        if (rplLoadInfo.IsPlayoutSelected is true)
+                                                        {
+                                                            if (rplLoadInfo.GetCurrentPlayout() != playoutId)
+                                                            {
+                                                                // If there is a current playout selected already, and the about-to-be-selected playout is different
+                                                                // then before we do any selections of the new playout, we need to pause the current playout.
+                                                                commandOutput = DoCommandPause() + "\r\n";
+                                                            }
+                                                        }
+
+                                                        commandOutput = commandOutput + DoCommandSelect(playoutId);
 
                                                         // Some basic validation on our part here to make sure that the RPL has been loaded first
                                                         if (rplLoadInfo.IsPlayoutSelected is true)
@@ -557,9 +568,22 @@ namespace AcsListener
             // In this version of DoCommandTime, we are (for now) assuming an editRateInput of "25 1" passed in
             // but eventually we will get this information from the loaded RPL file
 
-            RplReelDuration reelDuration = new RplReelDuration(timeOffsetInput, editRateInput);
-            UInt64 updatedEditUnits = reelDuration.EditUnits;
-            
+            RplReelDuration reelDuration;
+            UInt64 updatedEditUnits;
+
+            try
+            {
+                reelDuration = new RplReelDuration(timeOffsetInput, editRateInput);
+                updatedEditUnits = reelDuration.EditUnits;
+            }
+            catch (FormatException ex)
+            {
+                outputMessage = "Error: " + ex.Message;
+                return outputMessage;
+            }
+            finally
+            {
+            }
 
             // Some basic validation that we have a successfully loaded RPL
             if (rplLoadInfo.IsPlayoutSelected is true)
