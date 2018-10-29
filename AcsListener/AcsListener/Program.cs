@@ -539,7 +539,7 @@ namespace AcsListener
             if (rplLoadInfo.IsPlayoutSelected is true)
             {
                 ProcessSetOutputModeRrp(false);
-                ClearRplStatics();
+                ClearRplSelectedPlayout();
                 return "STOP action successfully completed.  ACS output has been paused, and the current PlayoutId has been cleared from memory";
             }
             else
@@ -548,7 +548,7 @@ namespace AcsListener
             }
         }
 
-        private static void ClearRplStatics()
+        private static void ClearRplSelectedPlayout()
         {
             rplLoadInfo.ClearCurrentPlayout();  // Sets the current PlayoutId to 0 and the IsPlayoutSelected will return false
         }
