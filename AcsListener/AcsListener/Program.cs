@@ -122,7 +122,7 @@ namespace AcsListener
             {
                 while (true)
                 {
-                    // go in to perpetual waiting loop here at the end, doing nothing but hanging out allowing the above try-block to do its thing
+                    Thread.Sleep(30000);
                 }
             }
 
@@ -725,7 +725,11 @@ namespace AcsListener
 
             // Need to set the RPL Location
             ProcessSetRplLocationRrp(playoutData.ResourceUrl, playoutData.PlayoutId);
-            ProcessGetStatusRrp();
+
+            while (ProcessGetStatusRrp() != "RrpSuccessful")
+            {
+                Thread.Sleep(500);
+            }
 
             // Special note here - this is just a LOAD action, not a SELECT, so no timeline update at this point
 
@@ -742,7 +746,7 @@ namespace AcsListener
             try
             {
                 rplLoadInfo.InsertRplData(playoutData);
-                outputMessage = "LOAD command issues successfully for: " + playoutData.ResourceUrl + "\r\n" + " PlayoutId #: " + playoutData.PlayoutId;
+                outputMessage = "LOAD command issued successfully for: " + playoutData.ResourceUrl + "\r\n" + " PlayoutId #: " + playoutData.PlayoutId;
             }
             catch (ArgumentException ex)
             {
@@ -765,7 +769,7 @@ namespace AcsListener
         /// <param name="obj">A generic object containing data of type ListenerProcessParams</param>
         static void ListenerProcess(object obj)
         {
-            const int timeoutValue = 10000;
+            const int timeoutValue = 2000;
             uint leaseSeconds = 60;
             // int numberOfBytes = 0;
             // UInt32 testPlayoutId = 49520318;
@@ -784,17 +788,22 @@ namespace AcsListener
                 //    3) Close the existing stream
                 //    4) Close the existing TCP connection
 
-                CanWriteToStream.WaitOne();   // Wait to make sure no one else is trying to write to the NetworkStream
-                CanWriteToStream.Reset();     // Disable writing to the ACS NetworkStream for any other thread
 
                 if (stream != null)
                 {
-                    stream.Close();               // Close and dispose of the ACS NetworkStream
-                    stream = null;                // Null out the static ACS NetworkStream
+                    try
+                    {
+                        CanWriteToStream.WaitOne();   // Wait to make sure no one else is trying to write to the NetworkStream
+                        CanWriteToStream.Reset();     // Disable writing to the ACS NetworkStream for any other thread
+                        stream.Close();               // Close and dispose of the ACS NetworkStream
+                    }
+                    finally
+                    {
+                        stream = null;                // Null out the static ACS NetworkStream
+                    }
                 }
 
                 ListenerClient.Close();           // Close the existing TCP connection
-
             }
 
             ListenerClient = myParams.Client;
@@ -829,6 +838,7 @@ namespace AcsListener
             }
             */
 
+
             try
             {
                 IPEndPoint remoteEnd = (IPEndPoint)ListenerClient.Client.RemoteEndPoint;
@@ -850,21 +860,33 @@ namespace AcsListener
                 stream = ListenerClient.GetStream();
                 stream.WriteTimeout = timeoutValue;  // sets the timeout to X milliseconds
                 stream.ReadTimeout = timeoutValue;  // sets the  timeout to X milliseconds
+
                 CanWriteToStream.Set();             // Finally, set the signal to indicate that the NetworkStream can be written to by other threads
+
+                Thread.Sleep(2000);                 // Brief pause to give any other cleanup activity the chance to finish
 
                 // Announce to ACS and get response, set lease with ACS, and finally get status from ACS.  All other actions handled by command process
                 ProcessAnnounceRrp();
                 ProcessGetNewLeaseRrp(leaseSeconds);
                 ProcessGetStatusRrp();
 
+                // As this is a new instance of ACS connection, start up a new instance of the rplLoadInfo static data
+                rplLoadInfo = new RplLoadInformation();
+
                 SetLeaseTimer((leaseSeconds * 1000) / 2);  // Convert to milliseconds and then halve the number
 
-                Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Will wait here until you press a key to exit this thread");
-                Console.ReadLine();
+                // Check for TCP connection 
 
-                ProcessTerminateLease();
-                
+                while (ListenerClient.Connected is true)
+                {
+                    Thread.Sleep(1000);
+                }
+
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]  Lost TCP connection with ACS!  Cleaning everything else up and waiting for new connection/lease.");
+
+                /*   I don't think we need this section right now, because DoAcsConnectionCleanup() does something similar
                 stream = null;   // Null set the NetworkStream object so that it is again available for next connection
+                */
             }
             catch (IOException ex)
             {
@@ -874,7 +896,7 @@ namespace AcsListener
             finally
             {
                 DoAcsConnectionCleanup();
-
+                rplLoadInfo = new RplLoadInformation();   // effectively clear out the static RPL information
             }
 
         }
@@ -887,14 +909,15 @@ namespace AcsListener
             {
                 try
                 {
-                    Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Attempting to close the NetworkStream and close the overall ACS TCP connection");
-                    CanWriteToStream.WaitOne();
+                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}] Attempting to close the NetworkStream and close the overall ACS TCP connection");
+                    CanWriteToStream.WaitOne(1000);
                     CanWriteToStream.Reset();    // Block so that nothing else attempts to write to the stream
                     stream.Close();
                 }
                 finally
                 {
                     stream = null;
+                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}] Successfully closed the NetworkStream and closed the overall ACS TCP connection");
                 }
             }
 
@@ -911,6 +934,10 @@ namespace AcsListener
                     {
                         ListenerClient = null;
                     }
+                }
+                else
+                {
+                    ListenerClient = null;
                 }
             }
 
@@ -1014,7 +1041,7 @@ namespace AcsListener
                 currentRequestId = announceRequest.RequestId;
 
                 stream.Write(announceRequest.PackArray, 0, announceRequest.PackArray.Length);
-                Console.WriteLine($"[{DateTime.Now}]Announce Request sent to ACS.  RequestID #: {currentRequestId}");
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]Announce Request sent to ACS.  RequestID #: {currentRequestId}");
 
                 // Wait for AnnounceResponse from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
@@ -1029,36 +1056,36 @@ namespace AcsListener
                     {
 
                         numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
-                        Console.WriteLine($"[Thread #{thread.ManagedThreadId}] {numberOfBytes}-byte header successfully read from network stream");
+                        Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader announceResponseHeader = new AcspResponseHeader(header);
                         if (announceResponseHeader.Key.IsBadRequest)
                         {
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: AnnounceResponse [Bad Message] received from ACS!");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: AnnounceResponse [Bad Message] received from ACS!");
                             // Need some control logic here to figure out how to handle a Bad Request message
                         }
 
                         if (announceResponseHeader.Key.IsGoodRequest)
                         {
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Good AnnounceResponse received from ACS!");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good AnnounceResponse received from ACS!");
                             int length = announceResponseHeader.PackLength.Length;
 
                             Byte[] bytes = new Byte[length];
                             numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: {numberOfBytes}-byte AnnounceResponse successfully read from network stream");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte AnnounceResponse successfully read from network stream");
 
                             AcspAnnounceResponse announceResponse = new AcspAnnounceResponse(bytes);
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: RequestId is: {announceResponse.RequestId}");
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: DeviceDescription is: {announceResponse.DeviceDescription}");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {announceResponse.RequestId}");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: DeviceDescription is: {announceResponse.DeviceDescription}");
 
                             if (announceResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful)
                             {
                                 announcePairSuccessful = true;
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Response Received: RrpSuccessful");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: RrpSuccessful");
                             }
                             else
                             {
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Response Received: {announceResponse.StatusResponseKeyString}");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {announceResponse.StatusResponseKeyString}");
                             }
                         }
                     }  // if (stream.DataAvailable == true)
@@ -1095,7 +1122,7 @@ namespace AcsListener
                 currentRequestId = leaseRequest.RequestId;
 
                 stream.Write(leaseRequest.PackArray, 0, leaseRequest.PackArray.Length);
-                Console.WriteLine($"[{DateTime.Now}]GetNewLease Request for {leaseSeconds} seconds sent to ACS.  RequestID #: {currentRequestId}");
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]GetNewLease Request for {leaseSeconds} seconds sent to ACS.  RequestID #: {currentRequestId}");
 
                 // Wait for AnnounceResponse from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
@@ -1109,40 +1136,40 @@ namespace AcsListener
                     {
 
                         numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
-                        Console.WriteLine($"[Thread #{thread.ManagedThreadId}] {numberOfBytes}-byte header successfully read from network stream");
+                        Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader announceResponseHeader = new AcspResponseHeader(header);
                         if (announceResponseHeader.Key.IsBadRequest)
                         {
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: GetNewLeaseResponse [Bad Message] received from ACS!");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: GetNewLeaseResponse [Bad Message] received from ACS!");
                             // Need some control logic here to figure out how to handle a Bad Request message
                         }
 
                         if (announceResponseHeader.Key.IsGoodRequest)
                         {
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Good GetNewLeaseResponse received from ACS!");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good GetNewLeaseResponse received from ACS!");
 
                             if (announceResponseHeader.Key.NodeNames == Byte13NodeNames.GetNewLeaseResponse)
                             {
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Expected GetNewLeaseResponse has been received");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Expected GetNewLeaseResponse has been received");
 
                                 int length = announceResponseHeader.PackLength.Length;
 
                                 Byte[] bytes = new Byte[length];
                                 numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: {numberOfBytes}-byte GetNewLeaseResponse successfully read from network stream");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte GetNewLeaseResponse successfully read from network stream");
 
                                 AcspGetNewLeaseResponse leaseResponse = new AcspGetNewLeaseResponse(bytes);
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: RequestId is: {leaseResponse.RequestId}");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {leaseResponse.RequestId}");
 
                                 if (leaseResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful)
                                 {
                                     messagePairSuccessful = true;
-                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Response Received: RrpSuccessful");
+                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: RrpSuccessful");
                                 }
                                 else
                                 {
-                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Response Received: {leaseResponse.StatusResponseKeyString}");
+                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {leaseResponse.StatusResponseKeyString}");
                                 }
                             }
                         }
@@ -1156,11 +1183,12 @@ namespace AcsListener
         }  // end ProcessGetNewLeaseRrp()
 
 
-        private static void ProcessGetStatusRrp()
+        private static string ProcessGetStatusRrp()
         {
             Thread thread = Thread.CurrentThread;
-            const int timeoutValue = 10000;
+            const int timeoutValue = 3000;
             int numberOfBytes;
+            string outputMessage = "";
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
@@ -1181,56 +1209,82 @@ namespace AcsListener
                 AcspGetStatusRequest statusRequest = new AcspGetStatusRequest();
                 currentRequestId = statusRequest.RequestId;
 
+                // Need to put in some code to check if there is data IN the stream waiting for us (which it shouldn't be) and FLUSH it if it is
+
                 stream.Write(statusRequest.PackArray, 0, statusRequest.PackArray.Length);
-                Console.WriteLine($"[{DateTime.Now}]GetStatus Request sent to ACS.  RequestID #: {currentRequestId}");
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]GetStatus Request sent to ACS.  RequestID #: {currentRequestId}");
 
                 // Wait for GetStatusResponse from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
 
+                string debugMessage = "";
+                int messageCounter = 0;
+
                 // Expecting a GetStatusResponse message
                 while (messagePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValue))
                 {
+                    if (debugOutput is true)
+                    {
+                        string thisMessage = "Debug Info: stopwatch elapsedMs is " + stopwatch.ElapsedMilliseconds + "ms";
+                        if (thisMessage == debugMessage)
+                        {
+                            messageCounter++;
+                        }
+                        else
+                        {
+                            if (messageCounter > 0)
+                            {
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] Debug Info: <previous message repeated {messageCounter} times");
+                            }
+                            messageCounter = 0;
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {thisMessage}");
+                            debugMessage = thisMessage;
+                        }
+                    }
+
                     if (stream.DataAvailable == true)
                     {
                         numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
-                        Console.WriteLine($"[Thread #{thread.ManagedThreadId}] {numberOfBytes}-byte header successfully read from network stream");
+                        Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader responseHeader = new AcspResponseHeader(header);
                         if (responseHeader.Key.IsBadRequest)
                         {
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: GetStatusResponse [Bad Message] received from ACS!");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: GetStatusResponse [Bad Message] received from ACS!");
                             // Need some control logic here to figure out how to handle a Bad Request message
                         }
 
                         if (responseHeader.Key.IsGoodRequest)
                         {
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Good GetStatusResponse received from ACS!");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good GetStatusResponse received from ACS!");
 
                             if (responseHeader.Key.NodeNames == Byte13NodeNames.GetStatusResponse)
                             {
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Expected GetStatusResponse has been received");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Expected GetStatusResponse has been received");
 
                                 int length = responseHeader.PackLength.Length;
 
                                 Byte[] bytes = new Byte[length];
                                 numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: {numberOfBytes}-byte GetStatusResponse successfully read from network stream");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte GetStatusResponse successfully read from network stream");
 
                                 AcspGetStatusResponse statusResponse = new AcspGetStatusResponse(bytes);
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: RequestId is: {statusResponse.RequestId}");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {statusResponse.RequestId}");
 
                                 if (statusResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful)
                                 {
-                                    messagePairSuccessful = true;
-                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Response Received: RrpSuccessful");
-                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Message Received: {statusResponse.StatusResponseMessage}");
+                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: RrpSuccessful");
+                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Message Received: {statusResponse.StatusResponseMessage}");
                                 }
                                 else
                                 {
-                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Response Received: {statusResponse.StatusResponseKeyString}");
+                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {statusResponse.StatusResponseKeyString}");
                                 }
+
+                                messagePairSuccessful = true;
+                                outputMessage = statusResponse.StatusResponseKeyString;
                             }
                         }
                     }  // if (stream.DataAvailable == true)
@@ -1238,6 +1292,7 @@ namespace AcsListener
             } // end while(messagePairSuccessful == false)
 
             CanWriteToStream.Set();  // Set signal to indicate that it is safe to write to the NetworkStream
+            return outputMessage;
 
         }  // end ProcessGetStatusRrp()
 
@@ -1281,42 +1336,42 @@ namespace AcsListener
                     if (stream.DataAvailable == true)
                     {
                         numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
-                        Console.WriteLine($"[Thread #{thread.ManagedThreadId}] {numberOfBytes}-byte header successfully read from network stream");
+                        Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader responseHeader = new AcspResponseHeader(header);
                         if (responseHeader.Key.IsBadRequest)
                         {
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: SetRplLocation [Bad Message] received from ACS!");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: SetRplLocation [Bad Message] received from ACS!");
                             // Need some control logic here to figure out how to handle a Bad Request message
                         }
 
                         if (responseHeader.Key.IsGoodRequest)
                         {
-                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Good SetRplLocationResponse received from ACS!");
+                            Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good SetRplLocationResponse received from ACS!");
 
                             if (responseHeader.Key.NodeNames == Byte13NodeNames.SetRplLocationResponse)
                             {
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Expected SetRplLocationResponse has been received");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Expected SetRplLocationResponse has been received");
 
                                 int length = responseHeader.PackLength.Length;
 
                                 Byte[] bytes = new Byte[length];
                                 numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: {numberOfBytes}-byte SetRplLocationResponse successfully read from network stream");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte SetRplLocationResponse successfully read from network stream");
 
                                 AcspSetRplLocationResponse locationResponse = new AcspSetRplLocationResponse(bytes);
-                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: RequestId is: {locationResponse.RequestId}");
+                                Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {locationResponse.RequestId}");
 
                                 if ((locationResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful) || 
                                     (locationResponse.StatusResponseKey == GeneralStatusResponseKey.Processing))
                                 {
                                     messagePairSuccessful = true;
-                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Response Received: {locationResponse.StatusResponseKeyString}");
-                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Message Received: {locationResponse.StatusResponseMessage}");
+                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {locationResponse.StatusResponseKeyString}");
+                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Message Received: {locationResponse.StatusResponseMessage}");
                                 }
                                 else
                                 {
-                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: Response Received: {locationResponse.StatusResponseKeyString}");
+                                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {locationResponse.StatusResponseKeyString}");
                                 }
                             }
                         }
