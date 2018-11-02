@@ -669,11 +669,21 @@ namespace AcsListener
 
             if (ConnectedToAcs is true)
             {
-                result = "ACS is currently connected";
+                result = "ACS: connected; Current Playout: ";
+
+                if (rplLoadInfo.GetCurrentPlayout() > 0)
+                {
+                    RplPlayoutData playoutData = rplLoadInfo.GetPlayoutData();
+                    result = result + playoutData.PlayoutId + " ( " + playoutData.ResourceUrl + " )";
+                }
+                else
+                {
+                    result = result + "None";
+                }
             }
             else
             {
-                result = "ACS is NOT connected";
+                result = "ACS: disconnected; Current Playout: None";
             }
 
             return result;
