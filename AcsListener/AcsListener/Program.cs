@@ -429,15 +429,54 @@ namespace AcsListener
                                                 break;
 
                                             case "UNLOAD":
-                                                // First thing, check to make sure that there is something that needs to be UNLOADed
+                                                // First, confirm that there is even a need for the unload command
+                                                if (rplLoadInfo.LoadCount <= 0)
+                                                {
+                                                    commandOutput = "UNLOAD action skipped, there are no RPLs loaded at this time";
+                                                    break;
+                                                }
+
+                                                // Next, confirm that the syntax of the command is correct and break early if not
                                                 if (CommandParameter == "")
                                                 {
                                                     commandOutput = "UNLOAD command requires a parameter in format of UNLOAD <parameter>, where parameter is the PlayoutId";
+                                                    break;
                                                 }
                                                 else
                                                 {
-                                                    commandOutput = "STUB for DoCommandUnload()";
+                                                    // Start the processing for the UNLOAD command
+                                                    UInt32 playoutId;
+                                                    try
+                                                    {
+                                                        // Get the Playout ID from the passed parameter
+                                                        playoutId = UInt32.Parse(CommandParameter);
 
+                                                        // Next check to see if a Playout has been selected
+                                                        if (rplLoadInfo.IsPlayoutSelected is true)
+                                                        {
+                                                            if (rplLoadInfo.GetCurrentPlayout() == playoutId)
+                                                            {
+                                                                // If there is a current playout selected already, and the about-to-be-unloaded playout is the same
+                                                                // then before we do anything else, we need to perform a STOP command first before we UNLOAD the RPL
+                                                                commandOutput = DoCommandStop() + "\r\n";
+                                                            }
+                                                        }
+
+                                                        // Now finally perform the UNLOAD action, remembering this doesn't actually do any unload on the ACS side
+                                                        // as there is no such equivalent for the ACS at this time.  This is important for us though because of the 
+                                                        // potential for the RELOAD action
+
+                                                        commandOutput = commandOutput + DoCommandUnload(playoutId);
+                                                        
+                                                        // commandOutput = "STUB for DoCommandUnload()";
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        commandOutput = "Error: " + ex.Message;
+                                                    }
+                                                    finally
+                                                    {
+                                                    }
                                                 }
 
                                                 break;
@@ -526,6 +565,25 @@ namespace AcsListener
 
         }
 
+        private static string DoCommandUnload(uint playoutId)
+        {
+            string outputMessage = "";
+
+            try
+            {
+                outputMessage = rplLoadInfo.RemoveRplData(playoutId);
+            }
+            catch (Exception ex)
+            {
+                outputMessage = "Error: " + ex.Message;
+            }
+            finally
+            {
+            }
+
+            return outputMessage;
+        }
+
         /// <summary>
         /// DoCommandSelect is the action method associated with the SELECT command in the CommandProcessor. 
         /// It calls the SetCurrentPlayout method of the static rplLoadInfo object, all else is handled internally
@@ -582,7 +640,7 @@ namespace AcsListener
             {
                 ProcessSetOutputModeRrp(false);
                 ClearRplSelectedPlayout();
-                return "STOP action successfully completed.  ACS output has been paused, and the current PlayoutId has been cleared from memory";
+                return "STOP action successfully completed.  ACS output has been paused. Current PlayoutId has been cleared from memory.";
             }
             else
             {
