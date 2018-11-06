@@ -58,24 +58,7 @@ namespace AcsListener
         // This next section represents static data that is stored at time of an RPL load action.  This should eventually
         // be moved to a static class to give greater control over how the data is set/read
 
-
         static RplLoadInformation rplLoadInfo = new RplLoadInformation();
-
-        /*  Not sure we need this section anymore, I just need to keep it around long enough to rewrite the usage for the new rplLoadInfo model
-        static UInt32 RplPlayoutId = 0;
-        static UInt64 RplTimelineOffset = 0;    // Probably won't be used in our implementation but see 430-10:2010, page 6 section 6.3.2.1 for more information
-        static string RplEditRate = "";
-        static string RplResourceUrl = "";
-        */
-
-
-    
-        
-        // Don't need this section anymore as these command line parameters have been obsoleted and shifted over to the command telnet connection
-        /*
-        static String rplUrl;
-        static String timeOffset;
-        */
 
         #endregion StaticData
 
@@ -87,6 +70,13 @@ namespace AcsListener
 
         }
 
+        /// <summary>
+        /// MainProcess is responsible for setting up both the ACS and Command TcpListener processes.
+        /// Everything is initialized for that, then MainProcess goes in to an infinite 30-second loop, and all else is 
+        /// handled by the child threads that are spawned whenever a TCP connection is established on either the ACS or 
+        /// Command port. 
+        /// </summary>
+        /// <param name="options">Command-line parameters passed in from Main</param>
         static void MainProcess(Options options)
         {
             debugOutput = options.DebugOutput;
@@ -152,16 +142,30 @@ namespace AcsListener
             */
         }
 
+        /// <summary>
+        /// HandleParseError is responsible for any logic associated with errors in the command line parameters.
+        /// Currently we don't do anything special with that, but we could if we wanted. 
+        /// </summary>
+        /// <param name="errs">A list of errors that were passed in from Main</param>
         static void HandleParseError(IEnumerable<Error> errs)
         {
 
         }
 
+        /// <summary>
+        /// OnAccept is the method called by MainProcess when one of the two ASYNC TCP connections establishes.
+        /// OnAccept handles connections on the default ACS port (always 4170) and the CommandProcess port (default 13000).
+        /// The method analyzes whether the connecting port is the ACS or the CommandProcess, and based on that port connection, 
+        /// it calls either the ListenerProcess (for ACS connections) or the CommandProcess.  
+        /// </summary>
+        /// <param name="res">A TcpListener object passed in from MainProcess, either for ACS or CommandProcess port.</param>
         static private void OnAccept(IAsyncResult res)
         {
+            // Set up the TcpClient to be used by later methods
             TcpListener listener = (TcpListener)res.AsyncState;
             TcpClient client = listener.EndAcceptTcpClient(res);
 
+            // Initialize some of the TCP-related information that is shown in the AcsListener console/logs
             IPEndPoint remoteEnd = (IPEndPoint)client.Client.RemoteEndPoint;
             IPEndPoint localEnd = (IPEndPoint)client.Client.LocalEndPoint;
             IPAddress remoteAddress = remoteEnd.Address;
@@ -171,12 +175,15 @@ namespace AcsListener
 
             Thread thread = Thread.CurrentThread;
 
+            // Output connection information to the AcsListener process
             Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Connection Established! ");
             Console.WriteLine($"   RemoteIP: {remoteAddress}, RemotePort: {remoteEnd.Port}, ");
             Console.WriteLine($"   LocalIP: {localAddress}, LocalPort: {localEnd.Port}");
 
+            // Initialize the ListenerProcessParams object for passing to the child thread (the TcpClient info)
             ListenerProcessParams processParams = new ListenerProcessParams(client);
 
+            // Depending on which port connected (ACS or Command) queue a thread for that process
             if (localEndPort == acsPort)
             {
                 ThreadPool.QueueUserWorkItem(ListenerProcess, processParams);
@@ -193,6 +200,14 @@ namespace AcsListener
             listener.BeginAcceptTcpClient(OnAccept, listener);
         }
 
+        /// <summary>
+        /// CommandProcess is the target of the worker thread that is launched when a connection is made on the Command port (default 13000).
+        /// The CommandProcess (sometimes referred to as the CommandProcessor) handles all of the proactive commands that need to be issued
+        /// to the ACS, such as setting OutputMode (true or false), specifying a location of an RPL file for Playout, updating Timeline, etc. 
+        /// All of these are handled through a variety of commands that are defined in this method (see comments further in the method for that).  
+        /// </summary>
+        /// <param name="obj">An object of type ListenerProcessParams, the main argument contained within is the TcpClient defined in the parent
+        /// process that calls this one.</param>
         static void CommandProcess(object obj)
         {
             var myParams = (ListenerProcessParams)obj;
@@ -215,6 +230,7 @@ namespace AcsListener
                     NetworkStream commandStream = CommandClient.GetStream();
                     String CommandGreeting = "COMMAND CONNECTION: WAITING FOR COMMAND INPUT\r\n";
 
+                    // Check the static ConnectedToAcs property to determine whether we have a stable ACS connection or not
                     if (ConnectedToAcs)
                     {
                         CommandGreeting = CommandGreeting + "( ACS connected ): ";
@@ -286,6 +302,7 @@ namespace AcsListener
                                     // Output the command details to the AcsListener console
                                     Console.WriteLine($"Thread #{thread.ManagedThreadId}:  Command Received:  {CommandBase.ToUpper()} {CommandParameter}");
 
+                                    // Confirm that we are connected to the ACS, and if so start processing input from Command connection
                                     if (ConnectedToAcs is true)
                                     {
                                         // Start processing based on which command was received
@@ -412,7 +429,17 @@ namespace AcsListener
                                                 break;
 
                                             case "UNLOAD":
-                                                commandOutput = "STUB for DoCommandUnload()";
+                                                // First thing, check to make sure that there is something that needs to be UNLOADed
+                                                if (CommandParameter == "")
+                                                {
+                                                    commandOutput = "UNLOAD command requires a parameter in format of UNLOAD <parameter>, where parameter is the PlayoutId";
+                                                }
+                                                else
+                                                {
+                                                    commandOutput = "STUB for DoCommandUnload()";
+
+                                                }
+
                                                 break;
 
                                             case "KILL":
@@ -499,6 +526,13 @@ namespace AcsListener
 
         }
 
+        /// <summary>
+        /// DoCommandSelect is the action method associated with the SELECT command in the CommandProcessor. 
+        /// It calls the SetCurrentPlayout method of the static rplLoadInfo object, all else is handled internally
+        /// from that object.  
+        /// </summary>
+        /// <param name="playoutId">A unique number between 10000000 and 99999999, generated for the RPL at time of RPL creation.</param>
+        /// <returns></returns>
         private static string DoCommandSelect(UInt32 playoutId)
         {
             string outputMessage;
@@ -508,6 +542,12 @@ namespace AcsListener
             return outputMessage;
         }
 
+        /// <summary>
+        /// DoCommandList is the action method associated with the LIST command for the CommandProcessor.  
+        /// It calls the GetRplLoadList() method of the static rplLoadInfo object, which returns a list of RPLs that are
+        /// currently loaded in to memory in the AcsListener. 
+        /// </summary>
+        /// <returns></returns>
         private static string DoCommandList()
         {
             string outputMessage;
@@ -531,11 +571,13 @@ namespace AcsListener
             return outputMessage;
         }
 
+        /// <summary>
+        /// DoCommandStop is the action method for the STOP command issued from the CommandProcessor. 
+        /// The method pauses any caption playout (setting OutputMode to FALSE), and then clears any selected Playout static data. 
+        /// </summary>
+        /// <returns></returns>
         private static string DoCommandStop()
         {
-            // Well firstly we need to decide what exactly a STOP command does.  
-            // My thought is that it would clear all the static Rpl-related variables, perform a STOP, and then terminate the ACS lease
-
             if (rplLoadInfo.IsPlayoutSelected is true)
             {
                 ProcessSetOutputModeRrp(false);
@@ -548,6 +590,10 @@ namespace AcsListener
             }
         }
 
+        /// <summary>
+        /// ClearRplSelectedPlayout uses the "ClearCurrentPlayout" method of the static rplLoadInfo data object and sets
+        /// the current PlayoutId to 0, and the IsPlayoutSelected property to false, all handled internally by the rplLoadInfo object. 
+        /// </summary>
         private static void ClearRplSelectedPlayout()
         {
             rplLoadInfo.ClearCurrentPlayout();  // Sets the current PlayoutId to 0 and the IsPlayoutSelected will return false

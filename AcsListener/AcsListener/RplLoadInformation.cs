@@ -6,21 +6,35 @@ using System.Threading.Tasks;
 
 namespace AcsListener
 {
+    /// <summary>
+    /// RplLoadInformation represents the essential data that needs to be kept (static) about the RPLs that have been loaded in 
+    /// to memory in AcsListener, and presumably loaded in to the ACS.
+    /// </summary>
     class RplLoadInformation
     {
         private Dictionary<UInt32, RplPlayoutData> _loadInfo = new Dictionary<UInt32, RplPlayoutData>();
         private UInt32 _currentPlayoutId;
 
+        /// <summary>
+        /// Basic constructor for the RplLoadInformation object
+        /// </summary>
         public RplLoadInformation()
         {
             InitializeData();
         }
 
+        /// <summary>
+        /// InitializeData is responsible for initializing (setting to 0) the current PlayoutId 
+        /// </summary>
         private void InitializeData()
         {
             _currentPlayoutId = 0;
         }
 
+        /// <summary>
+        /// InsertRplData method performs a dictionary add of the PlayoutID (as the key) and the rest of the Playout data
+        /// </summary>
+        /// <param name="playoutData">RplPlayoutData object representing the RPL data that needs to be kept</param>
         public void InsertRplData(RplPlayoutData playoutData)
         {
             if (playoutData.PlayoutId == 0)
@@ -31,6 +45,11 @@ namespace AcsListener
             _loadInfo.Add(playoutData.PlayoutId, playoutData);
         }
 
+        /// <summary>
+        /// RemoveRplData removes one stored RPL from the RplLoadInformation object
+        /// </summary>
+        /// <param name="playoutId">Playout ID that is to be removed</param>
+        /// <returns>String containing result of the operation</returns>
         public string RemoveRplData(UInt32 playoutId)
         {
             string outputMessage = "";
@@ -54,6 +73,11 @@ namespace AcsListener
             return outputMessage;
         }
 
+        /// <summary>
+        /// SetCurrentPlayout sets the current PlayoutId if the parameter matches one of the keys in the dictionary
+        /// </summary>
+        /// <param name="playoutId">Playout ID to be selected</param>
+        /// <returns>String containing the result of the operation</returns>
         public string SetCurrentPlayout(UInt32 playoutId)
         {
             string outputMessage = "";
@@ -73,19 +97,26 @@ namespace AcsListener
             return outputMessage;
         }
 
+        /// <summary>
+        /// GetCurrentPlayout returns the currently selected Playout ID
+        /// </summary>
+        /// <returns>UInt32 containing the Playout ID that is currently selected</returns>
         public UInt32 GetCurrentPlayout()
         {
             return _currentPlayoutId;
         }
 
         /// <summary>
-        /// I envision that this method would be used as part of the STOP command action
+        /// ClearCurrentPlayout initializes the current Playout ID to 0
         /// </summary>
         public void ClearCurrentPlayout()
         {
             _currentPlayoutId = 0;
         }
 
+        /// <summary>
+        /// IsPlayoutSelected property that represents whether there is a Playout ID selected (value greater than 0)
+        /// </summary>
         public bool IsPlayoutSelected
         {
             get
@@ -101,6 +132,9 @@ namespace AcsListener
             }
         }
 
+        /// <summary>
+        /// LoadCount property that represents the total number of RPLs currently loaded in the RplLoadInformation object
+        /// </summary>
         public int LoadCount
         {
             get
@@ -109,6 +143,10 @@ namespace AcsListener
             }
         }
 
+        /// <summary>
+        /// GetPlayoutData returns the RplPlayoutData object of the currently selected Playout ID from the dictionary
+        /// </summary>
+        /// <returns>RplPlayoutData object of the currently selected Playout ID</returns>
         public RplPlayoutData GetPlayoutData()
         {
             if (_currentPlayoutId == 0)
@@ -119,6 +157,10 @@ namespace AcsListener
             return _loadInfo[_currentPlayoutId];
         }
 
+        /// <summary>
+        /// GetRplLoadList builds a list of each RPL item in the dictionary
+        /// </summary>
+        /// <returns>String containing the Playout ID and Resource URL for each RPL in the dictionary</returns>
         public string GetRplLoadList()
         {
             string outputMessage = "Playout ID, Resource URL\r\n";
