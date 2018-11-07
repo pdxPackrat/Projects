@@ -548,6 +548,10 @@ namespace AcsListener
             {
                 Console.WriteLine($"SocketException: {e}");
             }
+            catch (IOException ex)
+            {
+                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]: IOException has occurred in connection with CommandProcessor: {ex.Message}");
+            }
             finally
             {
                 // Stop listening for new clients
