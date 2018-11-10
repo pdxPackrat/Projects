@@ -49,6 +49,7 @@ namespace AcsListener
         private static AcspLeaseTimer leaseTimer;
         private static ManualResetEvent CanWriteToStream = new ManualResetEvent(false);
         private static bool ConnectedToAcs = false;
+        private static bool KillCommandReceived = false;
         private static NetworkStream stream;
         private static TcpClient ListenerClient;
 
@@ -482,7 +483,8 @@ namespace AcsListener
                                                 break;
 
                                             case "KILL":
-                                                commandOutput = "STUB for DoCommandKill()";
+                                                commandOutput = DoCommandStop();
+                                                commandOutput = commandOutput + "\r\n" + DoCommandKill();
                                                 break;
 
                                             case "HELP":
@@ -567,6 +569,13 @@ namespace AcsListener
             }
 
 
+        }
+
+        private static string DoCommandKill()
+        {
+            KillCommandReceived = true;
+
+            return "KILL command issued to ListenerProcess";
         }
 
         private static string DoCommandUnload(uint playoutId)
@@ -925,37 +934,9 @@ namespace AcsListener
             }
 
             ListenerClient = myParams.Client;
-
-            /***  temporarily removed as these command-line options are no longer part of the design.  
-            String rplUrlPath = myParams.UrlPath;    // Needs to be fully-qualified URL that can be seen by the ACS system
-            String timeOffset = myParams.TimeOffset; // Time offset in the format of HH:MM:SS, MM:SS, or MM
-            */
+            KillCommandReceived = false;          // Initialize the control logic, only set to true by DoCommandKill()
 
             Thread thread = Thread.CurrentThread;
-
-
-            // Need some kind of URL / file validation present here prior to the XmlData load
-            // This doesn't get done here anymore - it should get processed in DoCommandLoad() instead
-            /*
-            ResourcePresentationList XmlData = LoadRplFromUrl(rplUrlPath);
-
-            UInt32 PlayoutId = XmlData.PlayoutId;
-            UInt64 timelineStart = XmlData.ReelResources.TimelineOffset;
-            String editRate = XmlData.ReelResources.EditRate;
-            RplReelDuration duration = new RplReelDuration(timeOffset, editRate);
-            UInt64 timelineEditUnits = duration.EditUnits;
-            string resourceUrl = rplUrlPath;
-
-            if (debugOutput is true)
-            {
-                Console.WriteLine($"PlayoutId:  {PlayoutId}");
-                Console.WriteLine($"timelineStart:  {timelineStart}");
-                Console.WriteLine($"editRate:  {editRate}");
-                Console.WriteLine($"timelineEditUnits:  {timelineEditUnits}");
-                Console.WriteLine($"resourceUrl:   {resourceUrl}");
-            }
-            */
-
 
             try
             {
@@ -995,12 +976,21 @@ namespace AcsListener
 
                 // Check for TCP connection 
 
-                while (ListenerClient.Connected is true)
+                while ((KillCommandReceived is false) && (ListenerClient.Connected is true))
                 {
                     Thread.Sleep(1000);
                 }
 
-                Console.WriteLine($"[Thread #{thread.ManagedThreadId}]  Lost TCP connection with ACS!  Cleaning everything else up and waiting for new connection/lease.");
+                // Determine reason for reaching this point
+                if (KillCommandReceived is true)
+                {
+                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]  KILL command issued from CommandProcess - terminating connection with ACS");
+                    ProcessTerminateLease();
+                }
+                else
+                {
+                    Console.WriteLine($"[Thread #{thread.ManagedThreadId}]  Lost TCP connection with ACS!  Cleaning everything else up and waiting for new connection/lease.");
+                }
 
                 /*   I don't think we need this section right now, because DoAcsConnectionCleanup() does something similar
                 stream = null;   // Null set the NetworkStream object so that it is again available for next connection
