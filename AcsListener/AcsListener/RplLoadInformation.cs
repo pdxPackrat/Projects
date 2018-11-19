@@ -172,5 +172,17 @@ namespace AcsListener
 
             return outputMessage;
         }
+
+        public List<string> GetRplUrlList()
+        {
+            List<string> UrlList = new List<string>();
+
+            foreach (RplPlayoutData data in _loadInfo.Values)
+            {
+                UrlList.Add(data.ResourceUrl);
+            }
+
+            return UrlList;
+        }
     }
 }

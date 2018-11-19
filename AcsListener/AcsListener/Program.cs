@@ -60,6 +60,7 @@ namespace AcsListener
         // be moved to a static class to give greater control over how the data is set/read
 
         static RplLoadInformation rplLoadInfo = new RplLoadInformation();
+        static RplLoadInformation rplReloadInfo;      // Set to rplLoadInfo if/when a new rplLoadInfo instance is created
 
         #endregion StaticData
 
@@ -288,6 +289,7 @@ namespace AcsListener
                                     // LIST   - outputs list of RPLs that have been LOADed, along with their index value
                                     // SELECT - choose an RPL to be the "ACTIVE" RPL that is passed the various commands that require PlayoutId 
                                     // UNLOAD - removes an RPL from the selection list.  Note there is no analogue to this on the ACS side.
+                                    // RELOAD - if any RPL are available for a RELOAD, it will reload all of them
                                     // KILL   - Performs a STOP, and then terminates the lease
 
                                     var CommandSplit = CommandInput.Split(' ');
@@ -482,6 +484,10 @@ namespace AcsListener
 
                                                 break;
 
+                                            case "RELOAD":
+                                                commandOutput = DoCommandReload();
+                                                break;
+
                                             case "KILL":
                                                 commandOutput = DoCommandStop();
                                                 commandOutput = commandOutput + "\r\n" + DoCommandKill();
@@ -569,6 +575,29 @@ namespace AcsListener
             }
 
 
+        }
+
+        private static string DoCommandReload()
+        {
+            string outputMessage = "RELOAD not possible as there are no RPLs to reload";
+
+            if (rplReloadInfo != null)
+            {
+                if (rplReloadInfo.LoadCount > 0)
+                {
+                    outputMessage = "Processing RELOAD command: \r\n";
+                    foreach(string UrlToReload in rplReloadInfo.GetRplUrlList())
+                    {
+                        outputMessage = outputMessage + DoCommandLoad(UrlToReload) + "\r\n";
+                    }
+
+                    // After successful RELOAD, we "ZERO" out the rplReloadInfo  
+                    // so that another RELOAD with the same data is not possible
+                    rplReloadInfo = new RplLoadInformation();
+                }
+            }
+
+            return outputMessage;
         }
 
         private static string DoCommandKill()
@@ -1004,6 +1033,16 @@ namespace AcsListener
             finally
             {
                 DoAcsConnectionCleanup();
+
+                // Prepare to clear out the rplLoadInfo static data, but before we do, if there are any RPLs loaded, we will save that off for possible RELOAD
+                if (rplLoadInfo != null)
+                {
+                    if (rplLoadInfo.LoadCount > 0)
+                    {
+                        rplReloadInfo = rplLoadInfo;
+                        Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Storing [{rplLoadInfo.LoadCount}] existing RPL information for RELOAD command use.");
+                    }
+                }
                 rplLoadInfo = new RplLoadInformation();   // effectively clear out the static RPL information
             }
 
