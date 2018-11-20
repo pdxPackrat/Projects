@@ -17,12 +17,20 @@ namespace SharedCommon
         [XmlElement ("ReelResources")]
         public ReelResources ReelResources { get; set; }
 
+        // It should be noted that PlayoutID is not UNIQUE, but an 8-digit rand generated between 10000000 and 99999999,
+        // effectively 90 million different unique values, but no guarantee that each one generated will be UNIQUE
         [XmlAttribute ("PlayoutID")]
         public UInt32 PlayoutId { get; set; }
 
         public ResourcePresentationList()
         {
             PlayoutId = RplPlayoutId.GenerateNewId();
+            ReelResources = new ReelResources();
+        }
+
+        public ResourcePresentationList(string inputUrl)
+        {
+            PlayoutId = RplPlayoutId.GenerateNewIdFromString(inputUrl);
             ReelResources = new ReelResources();
         }
     }
