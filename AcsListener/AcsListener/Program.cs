@@ -1178,6 +1178,12 @@ namespace AcsListener
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
 
+            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+            if (stream.DataAvailable is true)
+            {
+                stream.Flush();
+            }
+
             bool announcePairSuccessful = false;
             while (announcePairSuccessful == false)
             {
