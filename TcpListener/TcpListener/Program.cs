@@ -26,37 +26,33 @@ namespace MyTcpListener
             IPAddress LocalAddr = IPAddress.Parse("127.0.0.1");
 
             //TcpListener listener = new TcpListener(IPAddress.Any, port);
-            TcpListener listener = new TcpListener(LocalAddr, Port);
-            TcpListener listener2 = new TcpListener(LocalAddr, AltPort);
+            var listenerMain = new TcpListener(LocalAddr, Port);
+            var listenerAlt = new TcpListener(LocalAddr, AltPort);
 
-            TcpClient client;
-
-            listener.Start();
+            listenerMain.Start();
+            listenerAlt.Start();
             Console.WriteLine("Waiting for a connection ... ");
 
             try
             {
-                while (true)
-                {
-                    // Perform a blocking call to accept requests.
-                    // You could also use server.AcceptSocket() here.
-                    client = listener.AcceptTcpClient();
-
-                    // Some logic I threw in to get a quick idea of how many worker threads were available (2047)
-                    // int WorkerThreadCount;
-                    // int PortThreadCount;
-
-                    // ThreadPool.GetAvailableThreads(out WorkerThreadCount, out PortThreadCount);
-                    // Console.WriteLine($"There are {WorkerThreadCount} threads available for connection");
-
-                    ThreadPool.QueueUserWorkItem(ListenerProcess, client);
-                }
+                // Perform a non-blocking call to accept requests on either of the two ports.
+                listenerMain.BeginAcceptTcpClient(OnAccept, listenerMain);
+                listenerAlt.BeginAcceptTcpClient(OnAccept, listenerAlt);
             }
             finally
             {
-                Console.WriteLine("\nHit enter to continue...");
+                Console.WriteLine("\nHit any key from this console to exit this listener...");
                 Console.Read();
             }
+        }
+
+        static private void OnAccept(IAsyncResult res)
+        {
+            TcpListener listener = (TcpListener)res.AsyncState;
+            TcpClient client = listener.EndAcceptTcpClient(res);
+
+            ThreadPool.QueueUserWorkItem(ListenerProcess, client);
+            listener.BeginAcceptTcpClient(OnAccept, listener);
         }
 
         static void ListenerProcess(object obj)
@@ -79,6 +75,14 @@ namespace MyTcpListener
                 {
 
                     Console.WriteLine($"Thread #{thread.ManagedThreadId}: Connected!");
+                    IPEndPoint remoteEnd = (IPEndPoint)MyClient.Client.RemoteEndPoint;
+                    IPEndPoint localEnd = (IPEndPoint)MyClient.Client.LocalEndPoint;
+                    IPAddress remoteAddress = remoteEnd.Address;
+                    IPAddress localAddress = localEnd.Address;
+
+                    Console.WriteLine($"[Thread #: {thread.ManagedThreadId}] Connection Established! ");
+                    Console.WriteLine($"   RemoteIP: {remoteAddress}, RemotePort: {remoteEnd.Port}, ");
+                    Console.WriteLine($"   LocalIP: {localAddress}, LocalPort: {localEnd.Port}");
 
                     // Get a stream object for reading and writing.
                     NetworkStream stream = MyClient.GetStream();
@@ -112,7 +116,7 @@ namespace MyTcpListener
                             // If the data segment received is a CRLF, then take whatever parsed command so far and process it
                             if (data == "\r\n")
                             {
-                                if (command == "CANCEL" || command == "QUIT")
+                                if (command == "CANCEL" || command == "QUIT" || command == "EXIT")
                                 {
                                     Console.WriteLine($"Thread #{thread.ManagedThreadId}: CANCEL/QUIT command received - terminating connection");
                                     CancelCommandReceived = true;

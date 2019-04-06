@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<rpl:ResourcePresentationList PlayoutID="49520318" xsi:schemaLocation="http://www.smptera.org/schemas/430-11/2010/RPL AuxResourcePresentationList.xsd" xmlns:rpl="http://www.smptera.org/schemas/430-11/2010/RPL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <rpl:ReelResources ReelID="urn:uuid:2fd9f048-5646-4b75-b0e7-8839d28a4813" EditRate="25 1" TimelineOffset="0">
+    <rpl:ReelResource Language="en-us" Duration="172800" EntryPoint="0" ResourceType="ClosedCaption" Id="urn:uuid:2fd9f048-5646-4b75-b0e7-8839b1a395c9" IntrinsicDuration="172800">
+      <rpl:ResourceFile>/CaptiView/Damsel-VOD_2398_CC_eng.xml</rpl:ResourceFile>
+    </rpl:ReelResource>
+  </rpl:ReelResources>
+</rpl:ResourcePresentationList>
