@@ -494,7 +494,7 @@ namespace AcsListener
                                                 break;
 
                                             case "HELP":
-                                                commandOutput = "STUB for DoCommandHelp()";
+                                                commandOutput = DoCommandHelp();
                                                 break;
                                         }
                                     }
@@ -506,7 +506,7 @@ namespace AcsListener
                                     else if ((ConnectedToAcs is false) && (CommandBase.ToUpper() == "HELP"))
                                     {
                                         // the only other command allowed is "HELP"
-                                        commandOutput = "STUB for DoCommandHelp()";
+                                        commandOutput = DoCommandHelp();
                                     }
                                     else
                                     {
@@ -916,7 +916,29 @@ namespace AcsListener
 
         }
 
+        /// <summary>
+        /// DoCommandHelp() returns a list of commands and their usage to the CommandProcess 
+        /// </summary>
+        /// <returns>outputMessage as type String</returns>
+        private static string DoCommandHelp ()
+        {
+            string outputMessage = "List of available commands that we can take:\r\n\r\n" + 
+                "HELP   - Shows all of the available commands\r\n" + 
+                "STATUS - returns output to the connected user indicating whether ACS is connected or not\r\n" +
+                "         and is the only command that can be used when not connected to the ACS\r\n" + 
+                "LOAD   - in form of LOAD 'FullyQualifiedUrlPath', loads an RPL and informs connected ACS\r\n" + 
+                "STOP   - unloads the RPL from the connected ACS (and presumably would terminate the lease?)\r\n" + 
+                "PLAY   - sets the OutputModeRrp to 'true'\r\n" + 
+                "PAUSE  - sets the OutputModeRrp to 'false'\r\n" + 
+                "TIME   - calls UpdateTimelineRrp with a calculated edit units based on a parameter in HH:MM:SS, MM:SS, or MM format\r\n" + 
+                "LIST   - outputs list of RPLs that have been LOADed, along with their index value\r\n" + 
+                "SELECT - choose an RPL to be the 'ACTIVE' RPL that is passed the various commands that require PlayoutId\r\n" +
+                "UNLOAD - removes an RPL from the selection list.  Note there is no analogue to this on the ACS side\r\n" +
+                "RELOAD - if any RPL are available for a RELOAD, it will reload all of them\r\n" +
+                "KILL   - Performs a STOP, and then terminates the lease\r\n";
 
+            return outputMessage;
+}
 
         /// <summary>
         /// ListenerProcess is responsible handling most of the work of the AcsListener.  When a TCP connection is made, 
