@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.271
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RMS_Proofing", "RMS_Proofing\RMS_Proofing.csproj", "{480D7BB9-943C-4E4C-A593-837AB172929D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "RMS_Proofing_Tests", "RMS_Proofing_Tests", "{9AC359BF-63C5-4806-880C-F7956340FEC3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RMS_Proofing_Tests", "RMS_UnitTests\RMS_Proofing_Tests.csproj", "{970FE63E-E87C-419B-9039-11614F6450EA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{480D7BB9-943C-4E4C-A593-837AB172929D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{480D7BB9-943C-4E4C-A593-837AB172929D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{480D7BB9-943C-4E4C-A593-837AB172929D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{480D7BB9-943C-4E4C-A593-837AB172929D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{970FE63E-E87C-419B-9039-11614F6450EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{970FE63E-E87C-419B-9039-11614F6450EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{970FE63E-E87C-419B-9039-11614F6450EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{970FE63E-E87C-419B-9039-11614F6450EA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{970FE63E-E87C-419B-9039-11614F6450EA} = {9AC359BF-63C5-4806-880C-F7956340FEC3}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {535C1CC5-5DC2-40BA-A72F-84F46C48ABF3}
+	EndGlobalSection
+EndGlobal
