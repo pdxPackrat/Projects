@@ -38,7 +38,7 @@ namespace RMS_Proofing
             // int[] x = new int[] { 10, 9, 8, 10, 9, 8, 10, 9, 8, 10, 9, 8 };   //   RMS = 9.03696114115064 
             Int16[] x = new Int16[] { 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9 };   //   RMS = 9
 
-            textBox1.Text = (AudioMath.RootMeanSquare(x)).ToString();
+            TextboxRmsValue.Text = (AudioMath.RootMeanSquare(x)).ToString();
         }
 
         private void ButtonLoadFile_Click(object sender, EventArgs e)
@@ -78,41 +78,122 @@ namespace RMS_Proofing
             // PlaybackPcmAudio(reader);
         }
 
-        private void PlaybackPcmAudio(AudioFileReader reader)
+        private void DecodePcmAudio()
         {
             int bytesReadFromBuffer;
+            int samplesReadFromBuffer;
+            int totalSamplesReadFromBuffer = 0;
+            int framesReadFromBuffer = 0;
+
             int totalBytesToRead = bytesPerSample * samplesTotal;
             int frameCount = samplesTotal / channelCount;
             int frameSizeBytes = bytesPerSample * channelCount;
             int frameWindowSize = 1024;
             int frameWindowIndex = 0;
+            int framesRemaining;
             int dataIndex = 0;
+            int numberOfSamplesToRead = frameWindowSize * channelCount;
+
+            float rmsValue = 0f;
+            List<float> rmsList = new List<float>();
+
+            ISampleProvider decoder = new AudioFileReader(selectedFile);
+            float[] sampleBuffer = new float[1024];
+
+            while (decoder.Read(sampleBuffer, 0, sampleBuffer.Length) > 0)
+            {
+                rmsValue = AudioMath.RootMeanSquare(sampleBuffer);
+                TextboxRmsValue.Text = rmsValue.ToString();
+
+                rmsList.Add(rmsValue);
+                ListboxRmsList.Items.Add(rmsValue);
+
+                PlaybackAudioFromBuffer(sampleBuffer);
+            }
+        }
+
+        private void PlaybackAudioFromBuffer(float[] x)
+        {
+            byte[] byteStream = PcmData.ConvertFloatToBytes(x);
+
+            var ms = new MemoryStream(byteStream);
+            var rs = new RawSourceWaveStream(ms, new WaveFormat(sampleRate, bitsPerSample, channelCount));
+            var wo = new WaveOutEvent();
+            wo.Init(rs);
+            wo.Play();
+        }
+
+        /// <summary>
+        /// This method implementation is buggy as hell right now
+        /// </summary>
+        /// <param name="reader"></param>
+        private void PlaybackPcmAudio(AudioFileReader reader)
+        {
+            int bytesReadFromBuffer;
+            int samplesReadFromBuffer;
+            int totalSamplesReadFromBuffer = 0;
+            int framesReadFromBuffer = 0;
+
+            int totalBytesToRead = bytesPerSample * samplesTotal;
+            int frameCount = samplesTotal / channelCount;
+            int frameSizeBytes = bytesPerSample * channelCount;
+            int frameWindowSize = 1024;
+            int frameWindowIndex = 0;
+            int framesRemaining;
+            int dataIndex = 0;
+            int numberOfSamplesToRead = frameWindowSize * channelCount;
+
             float[] frameWindowBuffer = new float[frameWindowSize * (frameSizeBytes / 4)];
 
             byte[] PcmData = new byte[samplesTotal * bytesPerSample];
             float[] ReadBuffer = new float[channelCount];
 
+            if (reader.WaveFormat.Encoding == WaveFormatEncoding.IeeeFloat) // We are assuming IeeeFloat encoding for now
+            {
+                for (int i = 0; i < frameCount; i += frameWindowSize)
+                {
+                    framesRemaining = frameCount - framesReadFromBuffer; 
+
+                    if (framesRemaining < frameWindowSize)
+                    {
+                        // Normally numberOfSamplesToRead is equal to frameWindowSize * channelCount
+                        // This check is to make sure that there is enough data to read, and if not, to reduce the number of samples to read
+                        numberOfSamplesToRead = framesRemaining * channelCount;
+                    }
+
+                    samplesReadFromBuffer = reader.Read(frameWindowBuffer, totalSamplesReadFromBuffer, numberOfSamplesToRead);
+                    totalSamplesReadFromBuffer += samplesReadFromBuffer;
+                    framesReadFromBuffer = totalSamplesReadFromBuffer / channelCount;
+                }
+            }
+            else
+            {
+                return;
+            }
+
+            /* 
             for (int i = 0; i < frameCount; i++)  // spin through each sample, 1 for each channel 
             {
                 dataIndex = i * frameSizeBytes;
 
                 // Apparently the Read() function requires to read a full sample from ALL channels
-                bytesReadFromBuffer = reader.Read(PcmData, dataIndex, frameSizeBytes);
+                // bytesReadFromBuffer = reader.Read(PcmData, dataIndex, frameSizeBytes);
 
-                /*
-                if (reader.CanRead)
-                {
-                    bytesReadFromBuffer = reader.Read(ReadBuffer, 0, channelCount);
-                    float TempLeft = ReadBuffer[0];
-                    float TempRight = ReadBuffer[1];
+                // if (reader.CanRead)
+                // {
+                //     bytesReadFromBuffer = reader.Read(ReadBuffer, 0, channelCount);
+                //     float TempLeft = ReadBuffer[0];
+                //     float TempRight = ReadBuffer[1];
 
-                    Buffer.BlockCopy(ReadBuffer, 0, PcmData, i * bytesPerSample * channelCount, ReadBuffer.Length);
-                }
-                */
+                //     Buffer.BlockCopy(ReadBuffer, 0, PcmData, i * bytesPerSample * channelCount, ReadBuffer.Length);
+                // }
             }
+            */
 
             // Something is obviously wrong right now with my data extraction, as this next segment's playback sounds 
             // corrupted somehow. 
+
+            /* 
             var ms = new MemoryStream(PcmData);
             var rs = new RawSourceWaveStream(ms, new WaveFormat(sampleRate, bitsPerSample, channelCount));
             var wo = new WaveOutEvent();
@@ -125,6 +206,7 @@ namespace RMS_Proofing
             }
 
             wo.Dispose();
+            */
         }
 
         private void UpdateAudioInfoOnForm()
@@ -171,7 +253,8 @@ namespace RMS_Proofing
         {
             var reader = new AudioFileReader(selectedFile);
 
-            PlaybackPcmAudio(reader);
+            // PlaybackPcmAudio(reader);
+            DecodePcmAudio();
         }
     }
 }

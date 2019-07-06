@@ -31,7 +31,7 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.button1 = new System.Windows.Forms.Button();
             this.label1 = new System.Windows.Forms.Label();
-            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.TextboxRmsValue = new System.Windows.Forms.TextBox();
             this.ButtonLoadFile = new System.Windows.Forms.Button();
             this.ButtonPlayFile = new System.Windows.Forms.Button();
             this.LabelAudioFile = new System.Windows.Forms.Label();
@@ -46,6 +46,8 @@
             this.TextboxEncodingType = new System.Windows.Forms.TextBox();
             this.label6 = new System.Windows.Forms.Label();
             this.TextboxAudioFrames = new System.Windows.Forms.TextBox();
+            this.label7 = new System.Windows.Forms.Label();
+            this.ListboxRmsList = new System.Windows.Forms.ListBox();
             this.SuspendLayout();
             // 
             // button1
@@ -67,23 +69,21 @@
             this.label1.Location = new System.Drawing.Point(826, 110);
             this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(53, 20);
+            this.label1.Size = new System.Drawing.Size(49, 20);
             this.label1.TabIndex = 1;
-            this.label1.Text = "RMS: ";
-            this.label1.Visible = false;
+            this.label1.Text = "RMS:";
             // 
-            // textBox1
+            // TextboxRmsValue
             // 
-            this.textBox1.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.textBox1.Location = new System.Drawing.Point(887, 110);
-            this.textBox1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.textBox1.Name = "textBox1";
-            this.textBox1.ReadOnly = true;
-            this.textBox1.Size = new System.Drawing.Size(113, 19);
-            this.textBox1.TabIndex = 2;
-            this.textBox1.Text = "< Undefined >";
-            this.textBox1.Visible = false;
+            this.TextboxRmsValue.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.TextboxRmsValue.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.TextboxRmsValue.Location = new System.Drawing.Point(887, 110);
+            this.TextboxRmsValue.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.TextboxRmsValue.Name = "TextboxRmsValue";
+            this.TextboxRmsValue.ReadOnly = true;
+            this.TextboxRmsValue.Size = new System.Drawing.Size(113, 19);
+            this.TextboxRmsValue.TabIndex = 2;
+            this.TextboxRmsValue.Text = "< Undefined >";
             // 
             // ButtonLoadFile
             // 
@@ -247,11 +247,34 @@
             this.TextboxAudioFrames.TabIndex = 16;
             this.TextboxAudioFrames.Text = "placeholder";
             // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label7.Location = new System.Drawing.Point(801, 136);
+            this.label7.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(78, 20);
+            this.label7.TabIndex = 17;
+            this.label7.Text = "RMS List:";
+            this.label7.TextAlign = System.Drawing.ContentAlignment.TopRight;
+            // 
+            // ListboxRmsList
+            // 
+            this.ListboxRmsList.FormattingEnabled = true;
+            this.ListboxRmsList.ItemHeight = 20;
+            this.ListboxRmsList.Location = new System.Drawing.Point(887, 137);
+            this.ListboxRmsList.Name = "ListboxRmsList";
+            this.ListboxRmsList.Size = new System.Drawing.Size(140, 364);
+            this.ListboxRmsList.TabIndex = 18;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1039, 692);
+            this.Controls.Add(this.ListboxRmsList);
+            this.Controls.Add(this.label7);
             this.Controls.Add(this.TextboxAudioFrames);
             this.Controls.Add(this.label6);
             this.Controls.Add(this.TextboxEncodingType);
@@ -266,7 +289,7 @@
             this.Controls.Add(this.LabelAudioFile);
             this.Controls.Add(this.ButtonPlayFile);
             this.Controls.Add(this.ButtonLoadFile);
-            this.Controls.Add(this.textBox1);
+            this.Controls.Add(this.TextboxRmsValue);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.button1);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -283,7 +306,7 @@
 
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.TextBox textBox1;
+        private System.Windows.Forms.TextBox TextboxRmsValue;
         private System.Windows.Forms.Button ButtonLoadFile;
         private System.Windows.Forms.Button ButtonPlayFile;
         private System.Windows.Forms.Label LabelAudioFile;
@@ -298,6 +321,8 @@
         private System.Windows.Forms.TextBox TextboxEncodingType;
         private System.Windows.Forms.Label label6;
         private System.Windows.Forms.TextBox TextboxAudioFrames;
+        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.ListBox ListboxRmsList;
     }
 }
 
