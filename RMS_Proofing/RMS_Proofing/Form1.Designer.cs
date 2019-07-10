@@ -48,11 +48,13 @@
             this.TextboxAudioFrames = new System.Windows.Forms.TextBox();
             this.label7 = new System.Windows.Forms.Label();
             this.ListboxRmsList = new System.Windows.Forms.ListBox();
+            this.CheckboxShowDsp = new System.Windows.Forms.CheckBox();
+            this.ButtonClearRmsData = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(830, 14);
+            this.button1.Location = new System.Drawing.Point(25, 451);
             this.button1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(200, 86);
@@ -66,24 +68,25 @@
             // 
             this.label1.AutoSize = true;
             this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(826, 110);
+            this.label1.Location = new System.Drawing.Point(566, 147);
             this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(49, 20);
             this.label1.TabIndex = 1;
             this.label1.Text = "RMS:";
+            this.label1.Visible = false;
             // 
             // TextboxRmsValue
             // 
             this.TextboxRmsValue.BorderStyle = System.Windows.Forms.BorderStyle.None;
             this.TextboxRmsValue.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.TextboxRmsValue.Location = new System.Drawing.Point(887, 110);
+            this.TextboxRmsValue.Location = new System.Drawing.Point(623, 146);
             this.TextboxRmsValue.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.TextboxRmsValue.Name = "TextboxRmsValue";
             this.TextboxRmsValue.ReadOnly = true;
-            this.TextboxRmsValue.Size = new System.Drawing.Size(113, 19);
+            this.TextboxRmsValue.Size = new System.Drawing.Size(248, 19);
             this.TextboxRmsValue.TabIndex = 2;
-            this.TextboxRmsValue.Text = "< Undefined >";
+            this.TextboxRmsValue.Visible = false;
             // 
             // ButtonLoadFile
             // 
@@ -251,28 +254,55 @@
             // 
             this.label7.AutoSize = true;
             this.label7.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label7.Location = new System.Drawing.Point(801, 136);
+            this.label7.Location = new System.Drawing.Point(541, 173);
             this.label7.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label7.Name = "label7";
             this.label7.Size = new System.Drawing.Size(78, 20);
             this.label7.TabIndex = 17;
             this.label7.Text = "RMS List:";
             this.label7.TextAlign = System.Drawing.ContentAlignment.TopRight;
+            this.label7.Visible = false;
             // 
             // ListboxRmsList
             // 
             this.ListboxRmsList.FormattingEnabled = true;
             this.ListboxRmsList.ItemHeight = 20;
-            this.ListboxRmsList.Location = new System.Drawing.Point(887, 137);
+            this.ListboxRmsList.Location = new System.Drawing.Point(626, 173);
             this.ListboxRmsList.Name = "ListboxRmsList";
-            this.ListboxRmsList.Size = new System.Drawing.Size(140, 364);
+            this.ListboxRmsList.Size = new System.Drawing.Size(401, 364);
             this.ListboxRmsList.TabIndex = 18;
+            this.ListboxRmsList.Visible = false;
+            // 
+            // CheckboxShowDsp
+            // 
+            this.CheckboxShowDsp.AutoSize = true;
+            this.CheckboxShowDsp.Location = new System.Drawing.Point(570, 101);
+            this.CheckboxShowDsp.Name = "CheckboxShowDsp";
+            this.CheckboxShowDsp.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.CheckboxShowDsp.Size = new System.Drawing.Size(137, 24);
+            this.CheckboxShowDsp.TabIndex = 20;
+            this.CheckboxShowDsp.Text = "Show DSP Info";
+            this.CheckboxShowDsp.UseVisualStyleBackColor = true;
+            this.CheckboxShowDsp.Click += new System.EventHandler(this.CheckboxShowDsp_Click);
+            // 
+            // ButtonClearRmsData
+            // 
+            this.ButtonClearRmsData.Location = new System.Drawing.Point(764, 85);
+            this.ButtonClearRmsData.Name = "ButtonClearRmsData";
+            this.ButtonClearRmsData.Size = new System.Drawing.Size(242, 55);
+            this.ButtonClearRmsData.TabIndex = 21;
+            this.ButtonClearRmsData.Text = "Clear RMS Data";
+            this.ButtonClearRmsData.UseVisualStyleBackColor = true;
+            this.ButtonClearRmsData.Visible = false;
+            this.ButtonClearRmsData.Click += new System.EventHandler(this.ButtonClearRmsData_Click);
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1039, 692);
+            this.Controls.Add(this.ButtonClearRmsData);
+            this.Controls.Add(this.CheckboxShowDsp);
             this.Controls.Add(this.ListboxRmsList);
             this.Controls.Add(this.label7);
             this.Controls.Add(this.TextboxAudioFrames);
@@ -323,6 +353,8 @@
         private System.Windows.Forms.TextBox TextboxAudioFrames;
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.ListBox ListboxRmsList;
+        private System.Windows.Forms.CheckBox CheckboxShowDsp;
+        private System.Windows.Forms.Button ButtonClearRmsData;
     }
 }
 

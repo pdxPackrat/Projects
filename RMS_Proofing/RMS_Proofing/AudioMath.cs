@@ -115,5 +115,19 @@ namespace RMS_Proofing
 
             return dbfs;
         }
+
+        public static int ConvertToDbfs(float input)
+        {
+            int dbfs;
+
+            dbfs = (int)(Math.Round(20 * Math.Log10(input / 1f)));
+
+            if (dbfs < -90)
+            {
+                dbfs = -90;
+            }
+
+            return dbfs;
+        }
     }
 }

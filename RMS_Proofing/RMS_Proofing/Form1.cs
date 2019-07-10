@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -15,16 +16,21 @@ using NAudio.Wave.SampleProviders;
 
 namespace RMS_Proofing
 {
+
     public partial class Form1 : Form
     {
         private string selectedFile = "";
         private int samplesTotal;
         private int bytesPerSample;
         private int bitsPerSample;
+        private int bitRateOut = 16;
         private int channelCount;
         private int sampleRate;
         private string encodingType;
         private int audioFrames;
+        private static ManualResetEvent CanPlayAudio = new ManualResetEvent(true);
+        private float currentRmsValue = 0f;
+        private WaveOutEvent outputDevice;
 
         public Form1()
         {
@@ -93,38 +99,90 @@ namespace RMS_Proofing
             int framesRemaining;
             int dataIndex = 0;
             int numberOfSamplesToRead = frameWindowSize * channelCount;
-
-            float rmsValue = 0f;
-            List<float> rmsList = new List<float>();
-
+            int dbfsValue;
             ISampleProvider decoder = new AudioFileReader(selectedFile);
-            float[] sampleBuffer = new float[1024];
 
-            while (decoder.Read(sampleBuffer, 0, sampleBuffer.Length) > 0)
+            if (CheckboxShowDsp.Checked == true)
             {
-                rmsValue = AudioMath.RootMeanSquare(sampleBuffer);
-                TextboxRmsValue.Text = rmsValue.ToString();
+                float rmsValue = 0f;
+                List<string> rmsList = new List<string>();
 
-                rmsList.Add(rmsValue);
-                ListboxRmsList.Items.Add(rmsValue);
+                Stopwatch stopWatch = new Stopwatch();
+                stopWatch.Start();
 
-                PlaybackAudioFromBuffer(sampleBuffer);
+                // float[] sampleBuffer = new float[frameWindowSize * channelCount];
+                float[] sampleBuffer = new float[frameWindowSize * channelCount];
+
+                while (decoder.Read(sampleBuffer, 0, sampleBuffer.Length) > 0)
+                {
+                    rmsValue = AudioMath.RootMeanSquare(sampleBuffer);
+                    dbfsValue = AudioMath.ConvertToDbfs(rmsValue);
+
+                    CanPlayAudio.WaitOne();
+                    ThreadPool.QueueUserWorkItem(PlaybackAudioFromBuffer, sampleBuffer);
+
+                    long elapsedTime = stopWatch.ElapsedMilliseconds;
+                    string dbfsString = String.Format("Time: {0}ms, dBFS: {1}", elapsedTime.ToString(), dbfsValue.ToString());
+                    TextboxRmsValue.Text = dbfsString;
+
+                    rmsList.Add(dbfsString);
+                    ListboxRmsList.Items.Add(dbfsString);
+
+                    this.Update();
+                    CanPlayAudio.Reset();
+                }
+
+                stopWatch.Stop();
+            }
+            else
+            {
+                if (outputDevice == null)
+                {
+                    outputDevice = new WaveOutEvent();
+                    outputDevice.DesiredLatency = 600;
+                    outputDevice.PlaybackStopped += OnPlaybackStopped;
+                    outputDevice.Init(decoder);
+                    outputDevice.Play();
+                }
+
             }
         }
 
-        private void PlaybackAudioFromBuffer(float[] x)
+        private void OnPlaybackStopped(object sender, EventArgs args)
         {
-            byte[] byteStream = PcmData.ConvertFloatToBytes(x);
+            if (outputDevice != null)
+            {
+                outputDevice.Dispose();
+                outputDevice = null;
+            }
+
+            CanPlayAudio.Set();
+        }
+
+        private void PlaybackAudioFromBuffer(object obj)
+        {
+            var floats = (float[])obj;
+
+            // CanPlayAudio.Reset(); // Block the signal so that no other process can try to play audio while it is playing
+            
+            byte[] byteStream = PcmData.ConvertFloatToPcmBytes(floats);
 
             var ms = new MemoryStream(byteStream);
-            var rs = new RawSourceWaveStream(ms, new WaveFormat(sampleRate, bitsPerSample, channelCount));
-            var wo = new WaveOutEvent();
-            wo.Init(rs);
-            wo.Play();
+            var rs = new RawSourceWaveStream(ms, new WaveFormat(sampleRate, bitRateOut, channelCount));
+
+            if (outputDevice == null)
+            {
+                outputDevice = new WaveOutEvent();
+                outputDevice.DesiredLatency = 50;
+                outputDevice.PlaybackStopped += OnPlaybackStopped;
+            }
+
+            outputDevice.Init(rs);
+            outputDevice.Play();
         }
 
         /// <summary>
-        /// This method implementation is buggy as hell right now
+        /// This method implementation is buggy as hell right now and not used
         /// </summary>
         /// <param name="reader"></param>
         private void PlaybackPcmAudio(AudioFileReader reader)
@@ -255,6 +313,29 @@ namespace RMS_Proofing
 
             // PlaybackPcmAudio(reader);
             DecodePcmAudio();
+        }
+
+        private void CheckboxShowDsp_Click(object sender, EventArgs e)
+        {
+            bool visibility = false;
+
+            if (CheckboxShowDsp.Checked)
+            {
+                visibility = true;
+            }
+
+            label1.Visible = visibility;
+            label7.Visible = visibility;
+            TextboxRmsValue.Visible = visibility;
+            ListboxRmsList.Visible = visibility;
+            ButtonClearRmsData.Visible = visibility;
+        }
+
+        private void ButtonClearRmsData_Click(object sender, EventArgs e)
+        {
+            TextboxRmsValue.Text = "";
+            ListboxRmsList.Items.Clear();
+            this.Update();
         }
     }
 }
