@@ -8,6 +8,27 @@ namespace RMS_Proofing
 {
     public class AudioMath
     {
+        private int numChannels;
+
+        public AudioMath(Int16 [] x, int channels)
+        {
+            this.numChannels = channels;
+
+        }
+
+        public AudioMath(Int32 [] x, int channels)
+        {
+            this.numChannels = channels;
+
+        }
+
+        public AudioMath(float [] x, int channels)
+        {
+            this.numChannels = channels;
+
+
+        }
+
         public static Int16 RootMeanSquare(Int16[] x)
         {
             double sum = 0;

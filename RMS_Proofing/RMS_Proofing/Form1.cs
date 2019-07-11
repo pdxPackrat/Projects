@@ -118,8 +118,12 @@ namespace RMS_Proofing
                     rmsValue = AudioMath.RootMeanSquare(sampleBuffer);
                     dbfsValue = AudioMath.ConvertToDbfs(rmsValue);
 
+                    /*
                     CanPlayAudio.WaitOne();
                     ThreadPool.QueueUserWorkItem(PlaybackAudioFromBuffer, sampleBuffer);
+                    */
+
+                    PlaybackAudioFromBuffer(sampleBuffer);
 
                     long elapsedTime = stopWatch.ElapsedMilliseconds;
                     string dbfsString = String.Format("Time: {0}ms, dBFS: {1}", elapsedTime.ToString(), dbfsValue.ToString());
@@ -128,8 +132,8 @@ namespace RMS_Proofing
                     rmsList.Add(dbfsString);
                     ListboxRmsList.Items.Add(dbfsString);
 
-                    this.Update();
-                    CanPlayAudio.Reset();
+                    // this.Update();
+                    // CanPlayAudio.Reset();
                 }
 
                 stopWatch.Stop();
@@ -170,6 +174,7 @@ namespace RMS_Proofing
             var ms = new MemoryStream(byteStream);
             var rs = new RawSourceWaveStream(ms, new WaveFormat(sampleRate, bitRateOut, channelCount));
 
+            /*
             if (outputDevice == null)
             {
                 outputDevice = new WaveOutEvent();
@@ -179,6 +184,9 @@ namespace RMS_Proofing
 
             outputDevice.Init(rs);
             outputDevice.Play();
+            */
+
+            CanPlayAudio.Set();
         }
 
         /// <summary>
