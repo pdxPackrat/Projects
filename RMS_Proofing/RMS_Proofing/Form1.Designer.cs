@@ -50,6 +50,7 @@
             this.ListboxRmsList = new System.Windows.Forms.ListBox();
             this.CheckboxShowDsp = new System.Windows.Forms.CheckBox();
             this.ButtonClearRmsData = new System.Windows.Forms.Button();
+            this.CheckboxReverseList = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // button1
@@ -68,7 +69,7 @@
             // 
             this.label1.AutoSize = true;
             this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(566, 147);
+            this.label1.Location = new System.Drawing.Point(412, 146);
             this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(49, 20);
@@ -78,13 +79,13 @@
             // 
             // TextboxRmsValue
             // 
-            this.TextboxRmsValue.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.TextboxRmsValue.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.TextboxRmsValue.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.TextboxRmsValue.Location = new System.Drawing.Point(623, 146);
+            this.TextboxRmsValue.Location = new System.Drawing.Point(472, 146);
             this.TextboxRmsValue.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.TextboxRmsValue.Name = "TextboxRmsValue";
             this.TextboxRmsValue.ReadOnly = true;
-            this.TextboxRmsValue.Size = new System.Drawing.Size(248, 19);
+            this.TextboxRmsValue.Size = new System.Drawing.Size(555, 26);
             this.TextboxRmsValue.TabIndex = 2;
             this.TextboxRmsValue.Visible = false;
             // 
@@ -254,7 +255,7 @@
             // 
             this.label7.AutoSize = true;
             this.label7.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label7.Location = new System.Drawing.Point(541, 173);
+            this.label7.Location = new System.Drawing.Point(387, 172);
             this.label7.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label7.Name = "label7";
             this.label7.Size = new System.Drawing.Size(78, 20);
@@ -267,16 +268,16 @@
             // 
             this.ListboxRmsList.FormattingEnabled = true;
             this.ListboxRmsList.ItemHeight = 20;
-            this.ListboxRmsList.Location = new System.Drawing.Point(626, 173);
+            this.ListboxRmsList.Location = new System.Drawing.Point(472, 173);
             this.ListboxRmsList.Name = "ListboxRmsList";
-            this.ListboxRmsList.Size = new System.Drawing.Size(401, 364);
+            this.ListboxRmsList.Size = new System.Drawing.Size(555, 364);
             this.ListboxRmsList.TabIndex = 18;
             this.ListboxRmsList.Visible = false;
             // 
             // CheckboxShowDsp
             // 
             this.CheckboxShowDsp.AutoSize = true;
-            this.CheckboxShowDsp.Location = new System.Drawing.Point(570, 101);
+            this.CheckboxShowDsp.Location = new System.Drawing.Point(472, 85);
             this.CheckboxShowDsp.Name = "CheckboxShowDsp";
             this.CheckboxShowDsp.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.CheckboxShowDsp.Size = new System.Drawing.Size(137, 24);
@@ -296,11 +297,25 @@
             this.ButtonClearRmsData.Visible = false;
             this.ButtonClearRmsData.Click += new System.EventHandler(this.ButtonClearRmsData_Click);
             // 
+            // CheckboxReverseList
+            // 
+            this.CheckboxReverseList.AutoSize = true;
+            this.CheckboxReverseList.Enabled = false;
+            this.CheckboxReverseList.Location = new System.Drawing.Point(472, 114);
+            this.CheckboxReverseList.Name = "CheckboxReverseList";
+            this.CheckboxReverseList.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.CheckboxReverseList.Size = new System.Drawing.Size(153, 24);
+            this.CheckboxReverseList.TabIndex = 22;
+            this.CheckboxReverseList.Text = "Reverse DSP List";
+            this.CheckboxReverseList.UseVisualStyleBackColor = true;
+            this.CheckboxReverseList.Visible = false;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1039, 692);
+            this.ClientSize = new System.Drawing.Size(1039, 550);
+            this.Controls.Add(this.CheckboxReverseList);
             this.Controls.Add(this.ButtonClearRmsData);
             this.Controls.Add(this.CheckboxShowDsp);
             this.Controls.Add(this.ListboxRmsList);
@@ -323,6 +338,7 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.button1);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.Name = "Form1";
             this.Text = "Encoding: ";
@@ -355,6 +371,7 @@
         private System.Windows.Forms.ListBox ListboxRmsList;
         private System.Windows.Forms.CheckBox CheckboxShowDsp;
         private System.Windows.Forms.Button ButtonClearRmsData;
+        private System.Windows.Forms.CheckBox CheckboxReverseList;
     }
 }
 

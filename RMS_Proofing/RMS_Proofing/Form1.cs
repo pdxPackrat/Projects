@@ -1,4 +1,8 @@
-﻿using System;
+﻿#define DSP_USES_SIGNALS
+// #define DSP_PLAYS_AUDIO
+// #define DSP_FORCES_FORM_UPDATE
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -28,7 +32,7 @@ namespace RMS_Proofing
         private int sampleRate;
         private string encodingType;
         private int audioFrames;
-        private static ManualResetEvent CanPlayAudio = new ManualResetEvent(true);
+        private static AutoResetEvent CanPlayAudio = new AutoResetEvent(true);
         private float currentRmsValue = 0f;
         private WaveOutEvent outputDevice;
 
@@ -113,27 +117,47 @@ namespace RMS_Proofing
                 // float[] sampleBuffer = new float[frameWindowSize * channelCount];
                 float[] sampleBuffer = new float[frameWindowSize * channelCount];
 
-                while (decoder.Read(sampleBuffer, 0, sampleBuffer.Length) > 0)
+                while ((totalSamplesReadFromBuffer = decoder.Read(sampleBuffer, 0, sampleBuffer.Length)) > 0)
                 {
-                    rmsValue = AudioMath.RootMeanSquare(sampleBuffer);
+                    if (totalSamplesReadFromBuffer < sampleBuffer.Length)  // We must be at the end of the file then
+                    {
+                        rmsValue = AudioMath.RootMeanSquare(sampleBuffer, totalSamplesReadFromBuffer);
+                    }
+                    else
+                    {
+                        rmsValue = AudioMath.RootMeanSquare(sampleBuffer);
+                    }
+
                     dbfsValue = AudioMath.ConvertToDbfs(rmsValue);
 
-                    /*
+#if DSP_USES_SIGNALS
                     CanPlayAudio.WaitOne();
                     ThreadPool.QueueUserWorkItem(PlaybackAudioFromBuffer, sampleBuffer);
-                    */
+#else
 
                     PlaybackAudioFromBuffer(sampleBuffer);
+#endif
 
                     long elapsedTime = stopWatch.ElapsedMilliseconds;
-                    string dbfsString = String.Format("Time: {0}ms, dBFS: {1}", elapsedTime.ToString(), dbfsValue.ToString());
+                    string dbfsString = String.Format("FrameWindow: {0}, Time: {1}ms, dBFS: {2}", frameWindowIndex.ToString(), elapsedTime.ToString(), dbfsValue.ToString());
                     TextboxRmsValue.Text = dbfsString;
 
                     rmsList.Add(dbfsString);
-                    ListboxRmsList.Items.Add(dbfsString);
+                    if (CheckboxReverseList.Checked == true)
+                    {
+                        ListboxRmsList.Items.Insert(0, dbfsString);
+                    }
+                    else
+                    {
+                        ListboxRmsList.Items.Add(dbfsString);
+                    }
 
-                    // this.Update();
-                    // CanPlayAudio.Reset();
+                    frameWindowIndex++;
+
+#if DSP_FORCES_FORM_UPDATE
+                    this.Update();
+
+#endif
                 }
 
                 stopWatch.Stop();
@@ -142,10 +166,18 @@ namespace RMS_Proofing
             {
                 if (outputDevice == null)
                 {
+                    var trimmed = new OffsetSampleProvider(decoder)
+                    {
+                        // DelayBy = TimeSpan.FromSeconds(1),
+                        // LeadOut = TimeSpan.FromSeconds(1),
+                        // SkipOverSamples = 4096 * 4
+                    };
+
                     outputDevice = new WaveOutEvent();
                     outputDevice.DesiredLatency = 600;
+
                     outputDevice.PlaybackStopped += OnPlaybackStopped;
-                    outputDevice.Init(decoder);
+                    outputDevice.Init(trimmed);
                     outputDevice.Play();
                 }
 
@@ -167,14 +199,12 @@ namespace RMS_Proofing
         {
             var floats = (float[])obj;
 
-            // CanPlayAudio.Reset(); // Block the signal so that no other process can try to play audio while it is playing
-            
             byte[] byteStream = PcmData.ConvertFloatToPcmBytes(floats);
 
             var ms = new MemoryStream(byteStream);
             var rs = new RawSourceWaveStream(ms, new WaveFormat(sampleRate, bitRateOut, channelCount));
 
-            /*
+#if DSP_PLAYS_AUDIO
             if (outputDevice == null)
             {
                 outputDevice = new WaveOutEvent();
@@ -184,9 +214,11 @@ namespace RMS_Proofing
 
             outputDevice.Init(rs);
             outputDevice.Play();
-            */
+#elif DSP_USES_SIGNALS
+            CanPlayAudio.Set();  // Only set the signal here if we aren't playing back audio 
+                                 // since normally the PlaybackStopped event would handle setting the signal
+#endif
 
-            CanPlayAudio.Set();
         }
 
         /// <summary>
@@ -337,6 +369,8 @@ namespace RMS_Proofing
             TextboxRmsValue.Visible = visibility;
             ListboxRmsList.Visible = visibility;
             ButtonClearRmsData.Visible = visibility;
+            CheckboxReverseList.Visible = visibility;
+            CheckboxReverseList.Enabled = visibility;
         }
 
         private void ButtonClearRmsData_Click(object sender, EventArgs e)
