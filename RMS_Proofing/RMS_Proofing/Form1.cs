@@ -3,7 +3,9 @@
 // #define DSP_FORCES_FORM_UPDATE
 
 using System;
+using System.Configuration;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
@@ -17,6 +19,7 @@ using System.Windows.Forms;
 using NAudio;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
+using Serilog;
 
 namespace RMS_Proofing
 {
@@ -39,6 +42,26 @@ namespace RMS_Proofing
         public Form1()
         {
             InitializeComponent();
+
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File("logfile.log", rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            CheckConfigurationValues();
+        }
+
+        private void CheckConfigurationValues()
+        {
+            string defaultFile;
+
+            defaultFile = ConfigurationManager.AppSettings.Get("DefaultFile");
+
+            if (defaultFile != null && defaultFile != String.Empty)
+            {
+                selectedFile = defaultFile;
+                LoadSelectedFile(selectedFile);
+            }
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -62,16 +85,36 @@ namespace RMS_Proofing
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                ButtonPlayFile.Enabled = false;  // Diable the playback choice while we are in the middle of loading the file async
                 selectedFile = openFileDialog.FileName;
+            }
+
+            LoadSelectedFile(selectedFile);
+        }
+
+        private void LoadSelectedFile(string inputFilename)
+        {
+            // Should probably have something in here that at least checks to make sure that the file exists
+
+            if (File.Exists(inputFilename) == true)
+            {
+                Log.Debug("(LoadSelectedFile) Loading file: " + inputFilename);
+                ButtonPlayFile.Enabled = false;  // Diable the playback choice while we are in the middle of loading the file async
                 TextboxFileName.Text = selectedFile;
+
                 ExtractPcmInfoFromAudioFile();
             }
+            else
+            {
+                Log.Debug("(LoadSelectedFile) " + inputFilename + " does not exist - skipping this step");
+            }
+
         }
 
         private void ExtractPcmInfoFromAudioFile()
         {
             var reader = new AudioFileReader(selectedFile);
+            Log.Debug("Beginning extraction of audio data from " + reader.ToString());
+
             bitsPerSample = reader.WaveFormat.BitsPerSample;
             channelCount = reader.WaveFormat.Channels;
             sampleRate = reader.WaveFormat.SampleRate;
@@ -85,6 +128,10 @@ namespace RMS_Proofing
 
             UpdateAudioInfoOnForm();
             ButtonPlayFile.Enabled = true;
+
+            string audioDataToText = String.Format("BitsPerSample: {0}, ChannelCount: {1}, SampleRate: {2}, EncodingType{3}, BytesPerSample: {4}, AudioFrames: {5}",
+                                                    bitsPerSample, channelCount, sampleRate, encodingType, bytesPerSample, audioFrames);
+            Log.Debug(audioDataToText);
             // PlaybackPcmAudio(reader);
         }
 
@@ -106,6 +153,8 @@ namespace RMS_Proofing
             int dbfsValue;
             ISampleProvider decoder = new AudioFileReader(selectedFile);
 
+            Log.Debug("Beginning decode of PCM audio");
+
             if (CheckboxShowDsp.Checked == true)
             {
                 float rmsValue = 0f;
@@ -114,7 +163,6 @@ namespace RMS_Proofing
                 Stopwatch stopWatch = new Stopwatch();
                 stopWatch.Start();
 
-                // float[] sampleBuffer = new float[frameWindowSize * channelCount];
                 float[] sampleBuffer = new float[frameWindowSize * channelCount];
 
                 while ((totalSamplesReadFromBuffer = decoder.Read(sampleBuffer, 0, sampleBuffer.Length)) > 0)
@@ -182,6 +230,8 @@ namespace RMS_Proofing
                 }
 
             }
+
+            Log.Debug("Finished decode of PCM audio");
         }
 
         private void OnPlaybackStopped(object sender, EventArgs args)
