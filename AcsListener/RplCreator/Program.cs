@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
+using Serilog;
+using Serilog.Events;
 
 using CommandLine;
 using SharedCommon;
@@ -28,6 +30,11 @@ namespace RplCreator
     {
         static void Main(string[] args)
         {
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Error)
+                .WriteTo.File("RplCreatorLog-.txt", rollingInterval: RollingInterval.Day)
+                .CreateLogger();
              CommandLine.Parser.Default.ParseArguments<Options>(args)
                 .WithParsed<Options>(opts => MainProcessing(opts))
                 .WithNotParsed<Options>((errs) => HandleParseError(errs));
@@ -41,6 +48,7 @@ namespace RplCreator
 
         private static void MainProcessing(Options options)
         {
+
             string fileBasename = Path.GetFileName(options.InputFile);
 
             ResourcePresentationList Rpl = new ResourcePresentationList(fileBasename);  // string argument creates PlayoutId based on hash of the filename
@@ -112,7 +120,7 @@ namespace RplCreator
             }
             catch (FileNotFoundException ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                Log.Error($"Error: {ex.Message}");
             }
             finally
             {
