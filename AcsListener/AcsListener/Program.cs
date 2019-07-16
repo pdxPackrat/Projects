@@ -3,6 +3,8 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -43,8 +45,9 @@ namespace AcsListener
     class Program
     {
         #region StaticData
-        static readonly Int32 acsPort = 4170;  // Per SMPTE 430-10:2010 specifications
-        static readonly Int32 commandPort = 13000;  // Arbitrary port choice
+        private static Int32 acsPort = 4170;  // Per SMPTE 430-10:2010 specifications
+        private static Int32 commandPort = 13000;  // Arbitrary port choice, but appears to be unassigned at the moment according to
+                                                    // www.iana.org/assignments/service-names-port-numbers
 
         private static AcspLeaseTimer leaseTimer;
         private static ManualResetEvent CanWriteToStream = new ManualResetEvent(false);
@@ -81,6 +84,12 @@ namespace AcsListener
         /// <param name="options">Command-line parameters passed in from Main</param>
         static void MainProcess(Options options)
         {
+
+            AcsListenerConfigItems myConfig = new AcsListenerConfigItems();
+
+            acsPort = myConfig.AcsPort;
+            commandPort = myConfig.CommandPort;
+
             debugOutput = options.DebugOutput;
 
             // Don't need this section anymore as these command line parameters have been obsoleted and shifted over to the command telnet connection
