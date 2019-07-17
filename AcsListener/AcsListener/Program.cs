@@ -22,34 +22,17 @@ namespace AcsListener
 {
     class Options
     {
-        private string _playtimeOffset = "0";
-
         [Option('d', "debug", Required = false, HelpText = "Use for debugging purposes - provides more verbose output")]
         public bool DebugOutput { get; set; }
-
-        [Option('r', "rplUrl", Required = false, HelpText = "Specify an RPL URL which may include either full URL with IP address (not localhost) or relative location, example: /CaptiView/rpl_test1.xml")]
-        public string RplUrl { get; set; }
-
-        [Option('o', "offset", Required = false, HelpText = "Playtime offset in form of -o HH:MM:SS, -o MM:SS, or -o MM")]
-        public string PlaytimeOffset
-        {
-            get
-            {
-                return _playtimeOffset;
-            }
-            set
-            {
-                this._playtimeOffset = value;
-            }
-        }
     }
 
     class Program
     {
         #region StaticData
-        private static Int32 acsPort = 4170;  // Per SMPTE 430-10:2010 specifications
-        private static Int32 commandPort = 13000;  // Arbitrary port choice, but appears to be unassigned at the moment according to
-                                                    // www.iana.org/assignments/service-names-port-numbers
+        private static Int32 defaultAcsPort = 4170;       // Per SMPTE 430-10:2010 specifications
+        private static Int32 defaultCommandPort = 13000;  // Arbitrary port choice, but appears to be unassigned at the moment according to
+                                                          // www.iana.org/assignments/service-names-port-numbers
+        private static string defaultRplUrlPath = "";
 
         private static AcspLeaseTimer leaseTimer;
         private static ManualResetEvent CanWriteToStream = new ManualResetEvent(false);
@@ -95,8 +78,9 @@ namespace AcsListener
 
             AcsListenerConfigItems myConfig = new AcsListenerConfigItems();
 
-            acsPort = myConfig.AcsPort;
-            commandPort = myConfig.CommandPort;
+            defaultAcsPort = myConfig.AcsPort;
+            defaultCommandPort = myConfig.CommandPort;
+            defaultRplUrlPath = myConfig.RplUrlPath;
 
             debugOutput = options.DebugOutput;
 
@@ -112,8 +96,8 @@ namespace AcsListener
 
             IPAddress localAddress = IPAddress.Any;
 
-            TcpListener listenerAcs = new TcpListener(localAddress, acsPort);
-            TcpListener listenerCommand = new TcpListener(localAddress, commandPort);
+            TcpListener listenerAcs = new TcpListener(localAddress, defaultAcsPort);
+            TcpListener listenerCommand = new TcpListener(localAddress, defaultCommandPort);
 
             listenerAcs.Start();
             listenerCommand.Start();
@@ -202,12 +186,12 @@ namespace AcsListener
             ListenerProcessParams processParams = new ListenerProcessParams(client);
 
             // Depending on which port connected (ACS or Command) queue a thread for that process
-            if (localEndPort == acsPort)
+            if (localEndPort == defaultAcsPort)
             {
                 ThreadPool.QueueUserWorkItem(ListenerProcess, processParams);
             }
             
-            if (localEndPort == commandPort)
+            if (localEndPort == defaultCommandPort)
             {
                 ThreadPool.QueueUserWorkItem(CommandProcess, processParams);
             }
@@ -856,8 +840,18 @@ namespace AcsListener
 
             // Need some kind of URL / file validation present here prior to the XmlData load
 
-            ResourcePresentationList XmlData;
             string outputMessage = "";
+
+            if (defaultRplUrlPath != String.Empty)
+            {
+                Log.Debug($"Detected default RPL path. Testing whether a modified url path is valid: {defaultRplUrlPath + rplUrlPath}");
+                if (IsUrlValid(defaultRplUrlPath + rplUrlPath))
+                {
+                    rplUrlPath = defaultRplUrlPath + rplUrlPath;
+                }
+            }
+
+            ResourcePresentationList XmlData;
                 
             try
             {
@@ -905,14 +899,14 @@ namespace AcsListener
 
             // Special note here - this is just a LOAD action, not a SELECT, so no timeline update at this point
 
-            Console.WriteLine($"LOAD command issued successfully.");
+            Log.Information($"LOAD command issued successfully.");
             if (debugOutput is true)
             {
-                Console.WriteLine($"PlayoutId:  {playoutData.PlayoutId}");
-                Console.WriteLine($"timelineStart:  {playoutData.TimelineOffset}");
-                Console.WriteLine($"editRate:  {playoutData.EditRate}");
-                Console.WriteLine($"timelineEditUnits:  {timelineEditUnits}");
-                Console.WriteLine($"resourceUrl:   {playoutData.ResourceUrl}");
+                Log.Information($"PlayoutId:  {playoutData.PlayoutId}");
+                Log.Information($"timelineStart:  {playoutData.TimelineOffset}");
+                Log.Information($"editRate:  {playoutData.EditRate}");
+                Log.Information($"timelineEditUnits:  {timelineEditUnits}");
+                Log.Information($"resourceUrl:   {playoutData.ResourceUrl}");
             }
 
             try
@@ -1177,6 +1171,52 @@ namespace AcsListener
             // Send the deserialized data pointer back to the calling routine
             Log.Debug("Successfully loaded RPL data");
             return XmlData;
+        }
+
+
+        /// <summary>  This method will check a url to see that it does not return server or protocol errors</summary>
+        /// <param name="url">  The path to check</param>
+        /// <returns>
+        ///   <c>true</c> if [is URL valid] otherwise, <c>false</c>.</returns>
+        private static bool IsUrlValid(string url)
+        {
+            try
+            {
+                HttpWebRequest request = HttpWebRequest.Create(url) as HttpWebRequest;
+                request.Timeout =
+                    5000; // set the timeout to 5 seconds to keep the user from getting locked down by slow loading webpage
+                request.Method = "HEAD"; // Get only the header information -- no need for full content download
+
+                using (HttpWebResponse response = request.GetResponse() as HttpWebResponse)
+                {
+                    int statusCode = (int) response.StatusCode;
+                    if (statusCode >= 100 && statusCode < 400) // Good requests
+                    {
+                        return true;
+                    }
+                    else if (statusCode >= 500 && statusCode <= 510) // Server errors
+                    {
+                        Log.Debug($"The remote server has thrown an internal error.  Url is not valid: {url}");
+                    }
+                }
+            }
+            catch (WebException ex)
+            {
+                if (ex.Status == WebExceptionStatus.ProtocolError) // 400 errors
+                {
+                    return false;
+                }
+                else
+                {
+                    Log.Warning($"Unhandled status {ex.Status} returned for url: {url}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Could not test url: {url}");
+            }
+
+            return false;
         }
 
 
