@@ -8,6 +8,27 @@ namespace RMS_Proofing
 {
     public class AudioMath
     {
+        private int numChannels;
+
+        public AudioMath(Int16 [] x, int channels)
+        {
+            this.numChannels = channels;
+
+        }
+
+        public AudioMath(Int32 [] x, int channels)
+        {
+            this.numChannels = channels;
+
+        }
+
+        public AudioMath(float [] x, int channels)
+        {
+            this.numChannels = channels;
+
+
+        }
+
         public static Int16 RootMeanSquare(Int16[] x)
         {
             double sum = 0;
@@ -56,16 +77,25 @@ namespace RMS_Proofing
 
         public static float RootMeanSquare(float[] x)
         {
+            float result = 0f;
+
+            result = RootMeanSquare(x, x.Length);
+
+            return result;
+        }
+
+        public static float RootMeanSquare(float[] inputData, int totalSamplesToCalculate)
+        {
             double sum = 0;
             double temp = 0;
             float result = 0f;
 
-            for (int i = 0; i < x.Length; i++)
+            for (int i = 0; i < totalSamplesToCalculate; i++)
             {
-                sum += (x[i] * x[i]);
+                sum += (inputData[i] * inputData[i]);
             }
 
-            temp = (float)(Math.Sqrt(sum / x.Length));
+            temp = (float)(Math.Sqrt(sum / totalSamplesToCalculate));
 
             // check to see if we're clipping above maximum expected value of 1.0f
             if (temp > 1.0f)
@@ -76,8 +106,8 @@ namespace RMS_Proofing
             result = (float)temp;
 
             return result;
-        }
 
+        }
         /// <summary>
         /// Calculate dBFS based on previous RMS calculations
         /// </summary>
@@ -115,5 +145,20 @@ namespace RMS_Proofing
 
             return dbfs;
         }
+
+        public static int ConvertToDbfs(float input)
+        {
+            int dbfs;
+
+            dbfs = (int)(Math.Round(20 * Math.Log10(input / 1f)));
+
+            if (dbfs < -90)
+            {
+                dbfs = -90;
+            }
+
+            return dbfs;
+        }
+
     }
 }

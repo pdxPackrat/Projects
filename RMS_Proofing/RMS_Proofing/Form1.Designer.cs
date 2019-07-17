@@ -31,7 +31,7 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.button1 = new System.Windows.Forms.Button();
             this.label1 = new System.Windows.Forms.Label();
-            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.TextboxRmsValue = new System.Windows.Forms.TextBox();
             this.ButtonLoadFile = new System.Windows.Forms.Button();
             this.ButtonPlayFile = new System.Windows.Forms.Button();
             this.LabelAudioFile = new System.Windows.Forms.Label();
@@ -46,11 +46,16 @@
             this.TextboxEncodingType = new System.Windows.Forms.TextBox();
             this.label6 = new System.Windows.Forms.Label();
             this.TextboxAudioFrames = new System.Windows.Forms.TextBox();
+            this.label7 = new System.Windows.Forms.Label();
+            this.ListboxRmsList = new System.Windows.Forms.ListBox();
+            this.CheckboxShowDsp = new System.Windows.Forms.CheckBox();
+            this.ButtonClearRmsData = new System.Windows.Forms.Button();
+            this.CheckboxReverseList = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(830, 14);
+            this.button1.Location = new System.Drawing.Point(25, 451);
             this.button1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(200, 86);
@@ -64,26 +69,25 @@
             // 
             this.label1.AutoSize = true;
             this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(826, 110);
+            this.label1.Location = new System.Drawing.Point(412, 146);
             this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(53, 20);
+            this.label1.Size = new System.Drawing.Size(49, 20);
             this.label1.TabIndex = 1;
-            this.label1.Text = "RMS: ";
+            this.label1.Text = "RMS:";
             this.label1.Visible = false;
             // 
-            // textBox1
+            // TextboxRmsValue
             // 
-            this.textBox1.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.textBox1.Location = new System.Drawing.Point(887, 110);
-            this.textBox1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.textBox1.Name = "textBox1";
-            this.textBox1.ReadOnly = true;
-            this.textBox1.Size = new System.Drawing.Size(113, 19);
-            this.textBox1.TabIndex = 2;
-            this.textBox1.Text = "< Undefined >";
-            this.textBox1.Visible = false;
+            this.TextboxRmsValue.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.TextboxRmsValue.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.TextboxRmsValue.Location = new System.Drawing.Point(472, 146);
+            this.TextboxRmsValue.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.TextboxRmsValue.Name = "TextboxRmsValue";
+            this.TextboxRmsValue.ReadOnly = true;
+            this.TextboxRmsValue.Size = new System.Drawing.Size(555, 26);
+            this.TextboxRmsValue.TabIndex = 2;
+            this.TextboxRmsValue.Visible = false;
             // 
             // ButtonLoadFile
             // 
@@ -247,11 +251,75 @@
             this.TextboxAudioFrames.TabIndex = 16;
             this.TextboxAudioFrames.Text = "placeholder";
             // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label7.Location = new System.Drawing.Point(387, 172);
+            this.label7.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(78, 20);
+            this.label7.TabIndex = 17;
+            this.label7.Text = "RMS List:";
+            this.label7.TextAlign = System.Drawing.ContentAlignment.TopRight;
+            this.label7.Visible = false;
+            // 
+            // ListboxRmsList
+            // 
+            this.ListboxRmsList.FormattingEnabled = true;
+            this.ListboxRmsList.ItemHeight = 20;
+            this.ListboxRmsList.Location = new System.Drawing.Point(472, 173);
+            this.ListboxRmsList.Name = "ListboxRmsList";
+            this.ListboxRmsList.Size = new System.Drawing.Size(555, 364);
+            this.ListboxRmsList.TabIndex = 18;
+            this.ListboxRmsList.Visible = false;
+            // 
+            // CheckboxShowDsp
+            // 
+            this.CheckboxShowDsp.AutoSize = true;
+            this.CheckboxShowDsp.Location = new System.Drawing.Point(472, 85);
+            this.CheckboxShowDsp.Name = "CheckboxShowDsp";
+            this.CheckboxShowDsp.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.CheckboxShowDsp.Size = new System.Drawing.Size(137, 24);
+            this.CheckboxShowDsp.TabIndex = 20;
+            this.CheckboxShowDsp.Text = "Show DSP Info";
+            this.CheckboxShowDsp.UseVisualStyleBackColor = true;
+            this.CheckboxShowDsp.Click += new System.EventHandler(this.CheckboxShowDsp_Click);
+            // 
+            // ButtonClearRmsData
+            // 
+            this.ButtonClearRmsData.Location = new System.Drawing.Point(764, 85);
+            this.ButtonClearRmsData.Name = "ButtonClearRmsData";
+            this.ButtonClearRmsData.Size = new System.Drawing.Size(242, 55);
+            this.ButtonClearRmsData.TabIndex = 21;
+            this.ButtonClearRmsData.Text = "Clear RMS Data";
+            this.ButtonClearRmsData.UseVisualStyleBackColor = true;
+            this.ButtonClearRmsData.Visible = false;
+            this.ButtonClearRmsData.Click += new System.EventHandler(this.ButtonClearRmsData_Click);
+            // 
+            // CheckboxReverseList
+            // 
+            this.CheckboxReverseList.AutoSize = true;
+            this.CheckboxReverseList.Enabled = false;
+            this.CheckboxReverseList.Location = new System.Drawing.Point(472, 114);
+            this.CheckboxReverseList.Name = "CheckboxReverseList";
+            this.CheckboxReverseList.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.CheckboxReverseList.Size = new System.Drawing.Size(153, 24);
+            this.CheckboxReverseList.TabIndex = 22;
+            this.CheckboxReverseList.Text = "Reverse DSP List";
+            this.CheckboxReverseList.UseVisualStyleBackColor = true;
+            this.CheckboxReverseList.Visible = false;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1039, 692);
+            this.ClientSize = new System.Drawing.Size(1039, 550);
+            this.Controls.Add(this.CheckboxReverseList);
+            this.Controls.Add(this.ButtonClearRmsData);
+            this.Controls.Add(this.CheckboxShowDsp);
+            this.Controls.Add(this.ListboxRmsList);
+            this.Controls.Add(this.label7);
             this.Controls.Add(this.TextboxAudioFrames);
             this.Controls.Add(this.label6);
             this.Controls.Add(this.TextboxEncodingType);
@@ -266,10 +334,11 @@
             this.Controls.Add(this.LabelAudioFile);
             this.Controls.Add(this.ButtonPlayFile);
             this.Controls.Add(this.ButtonLoadFile);
-            this.Controls.Add(this.textBox1);
+            this.Controls.Add(this.TextboxRmsValue);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.button1);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.Name = "Form1";
             this.Text = "Encoding: ";
@@ -283,7 +352,7 @@
 
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.TextBox textBox1;
+        private System.Windows.Forms.TextBox TextboxRmsValue;
         private System.Windows.Forms.Button ButtonLoadFile;
         private System.Windows.Forms.Button ButtonPlayFile;
         private System.Windows.Forms.Label LabelAudioFile;
@@ -298,6 +367,11 @@
         private System.Windows.Forms.TextBox TextboxEncodingType;
         private System.Windows.Forms.Label label6;
         private System.Windows.Forms.TextBox TextboxAudioFrames;
+        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.ListBox ListboxRmsList;
+        private System.Windows.Forms.CheckBox CheckboxShowDsp;
+        private System.Windows.Forms.Button ButtonClearRmsData;
+        private System.Windows.Forms.CheckBox CheckboxReverseList;
     }
 }
 
