@@ -22,26 +22,8 @@ namespace AcsListener
 {
     class Options
     {
-        private string _playtimeOffset = "0";
-
         [Option('d', "debug", Required = false, HelpText = "Use for debugging purposes - provides more verbose output")]
         public bool DebugOutput { get; set; }
-
-        [Option('r', "rplUrl", Required = false, HelpText = "Specify an RPL URL which may include either full URL with IP address (not localhost) or relative location, example: /CaptiView/rpl_test1.xml")]
-        public string RplUrl { get; set; }
-
-        [Option('o', "offset", Required = false, HelpText = "Playtime offset in form of -o HH:MM:SS, -o MM:SS, or -o MM")]
-        public string PlaytimeOffset
-        {
-            get
-            {
-                return _playtimeOffset;
-            }
-            set
-            {
-                this._playtimeOffset = value;
-            }
-        }
     }
 
     class Program
@@ -71,12 +53,14 @@ namespace AcsListener
 
         static void Main(string[] args)
         {
+            // Configure the Serilog logger to write to console and file
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Information)
                 .WriteTo.File("AcsListenerLog-.txt", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
+            // Check if we are passing command line arguments in the allowed format
             CommandLine.Parser.Default.ParseArguments<Options>(args)
                 .WithParsed<Options>(opts => MainProcess(opts))
                 .WithNotParsed<Options>((errs) => HandleParseError(errs));
@@ -905,7 +889,7 @@ namespace AcsListener
 
             // Special note here - this is just a LOAD action, not a SELECT, so no timeline update at this point
 
-            Console.WriteLine($"LOAD command issued successfully.");
+            Log.Information("LOAD command issued successfully.");
             if (debugOutput is true)
             {
                 Console.WriteLine($"PlayoutId:  {playoutData.PlayoutId}");
