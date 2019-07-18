@@ -850,6 +850,11 @@ namespace AcsListener
                 if (IsUrlValid(defaultRplUrlPath + rplUrlPath))
                 {
                     rplUrlPath = defaultRplUrlPath + rplUrlPath;
+                    Log.Debug($"Confirmed that modified path is valid: {rplUrlPath}");
+                }
+                else
+                {
+                    Log.Debug($"Modified path is not valid: {defaultRplUrlPath + rplUrlPath}");
                 }
             }
 
@@ -861,11 +866,13 @@ namespace AcsListener
             }
             catch (ArgumentException ex)
             {
+                Log.Debug($"ArgumentException received while trying to load RPL file: {ex.Message}");
                 outputMessage = "Error performing LOAD command: " + ex.Message;
                 return outputMessage;
             }
             catch (WebException ex)
             {
+                Log.Debug($"WebException received while trying to load RPL file: {ex.Message}");
                 outputMessage = "Error performing LOAD command: " + ex.Message;
                 return outputMessage;
             }
@@ -1134,7 +1141,8 @@ namespace AcsListener
 
         private static ResourcePresentationList LoadRplFromUrl(string rplUrlPath)
         {
-            Log.Debug("Attempting to load RPL file");
+            Log.Debug($"Attempting to load RPL file: {rplUrlPath}");
+
             // Define the XmlSerializer casting to be of type ResourcePresentationList
             XmlSerializer Deserializer = new XmlSerializer(typeof(ResourcePresentationList));
             ResourcePresentationList XmlData;
