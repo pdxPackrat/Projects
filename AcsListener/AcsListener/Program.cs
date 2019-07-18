@@ -54,12 +54,14 @@ namespace AcsListener
 
         static void Main(string[] args)
         {
+            // Configure the Serilog logger to write to console and file
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Information)
                 .WriteTo.File("AcsListenerLog-.txt", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
+            // Check if we are passing command line arguments in the allowed format
             CommandLine.Parser.Default.ParseArguments<Options>(args)
                 .WithParsed<Options>(opts => MainProcess(opts))
                 .WithNotParsed<Options>((errs) => HandleParseError(errs));
@@ -848,22 +850,35 @@ namespace AcsListener
                 if (IsUrlValid(defaultRplUrlPath + rplUrlPath))
                 {
                     rplUrlPath = defaultRplUrlPath + rplUrlPath;
+                    Log.Debug($"Confirmed that modified path is valid: {rplUrlPath}");
+                }
+                else
+                {
+                    Log.Debug($"Modified path is not valid: {defaultRplUrlPath + rplUrlPath}");
                 }
             }
 
             ResourcePresentationList XmlData;
-                
+
             try
             {
                 XmlData = LoadRplFromUrl(rplUrlPath);
             }
             catch (ArgumentException ex)
             {
+                Log.Debug($"ArgumentException received while trying to load RPL file: {ex.Message}");
                 outputMessage = "Error performing LOAD command: " + ex.Message;
                 return outputMessage;
             }
             catch (WebException ex)
             {
+                Log.Debug($"WebException received while trying to load RPL file: {ex.Message}");
+                outputMessage = "Error performing LOAD command: " + ex.Message;
+                return outputMessage;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Log.Debug($"InvalidOperationException received while trying to load RPL file: {ex.Message}");
                 outputMessage = "Error performing LOAD command: " + ex.Message;
                 return outputMessage;
             }
@@ -1132,7 +1147,8 @@ namespace AcsListener
 
         private static ResourcePresentationList LoadRplFromUrl(string rplUrlPath)
         {
-            Log.Debug("Attempting to load RPL file");
+            Log.Debug($"Attempting to load RPL file: {rplUrlPath}");
+
             // Define the XmlSerializer casting to be of type ResourcePresentationList
             XmlSerializer Deserializer = new XmlSerializer(typeof(ResourcePresentationList));
             ResourcePresentationList XmlData;
