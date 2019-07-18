@@ -859,7 +859,7 @@ namespace AcsListener
             }
 
             ResourcePresentationList XmlData;
-                
+
             try
             {
                 XmlData = LoadRplFromUrl(rplUrlPath);
@@ -873,6 +873,12 @@ namespace AcsListener
             catch (WebException ex)
             {
                 Log.Debug($"WebException received while trying to load RPL file: {ex.Message}");
+                outputMessage = "Error performing LOAD command: " + ex.Message;
+                return outputMessage;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Log.Debug($"InvalidOperationException received while trying to load RPL file: {ex.Message}");
                 outputMessage = "Error performing LOAD command: " + ex.Message;
                 return outputMessage;
             }
