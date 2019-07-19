@@ -29,6 +29,11 @@ namespace RMS_Proofing
 
         }
 
+        /// <summary>
+        /// Just adding some comments to cause a potential merge conflict
+        /// </summary>
+        /// <param name="x"></param>
+        /// <returns></returns>
         public static Int16 RootMeanSquare(Int16[] x)
         {
             double sum = 0;
@@ -75,6 +80,11 @@ namespace RMS_Proofing
             return result;
         }
 
+        /// <summary>
+        /// Just adding some comments to cause a potential merge conflict
+        /// </summary>
+        /// <param name="x"></param>
+        /// <returns></returns>
         public static float RootMeanSquare(float[] x)
         {
             float result = 0f;
@@ -84,6 +94,11 @@ namespace RMS_Proofing
             return result;
         }
 
+        /// <summary>
+        /// Just adding some comments to cause a potential merge conflict
+        /// </summary>
+        /// <param name="x"></param>
+        /// <returns></returns>
         public static float RootMeanSquare(float[] inputData, int totalSamplesToCalculate)
         {
             double sum = 0;
