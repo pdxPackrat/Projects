@@ -264,6 +264,11 @@ namespace AcsListener
                             CancelCommandReceived = true;   // set boolean logic to exit the while-loop
                             Log.Information("Received Cancel Command");
                         }
+                        else if (data == "\b")
+                        {
+                            // Need to trim the last character in CommandInput, if it has anything in it
+                            CommandInput = CommandInput.TrimLastCharacter();
+                        }
                         else
                         {
                             // Process the data sent by the client
