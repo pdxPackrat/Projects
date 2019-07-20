@@ -419,7 +419,11 @@ namespace AcsListener
                                                         }
                                                         else
                                                         {
-                                                            commandOutput = "TIME command cannot be used until an RPL is chosen by SELECT";
+                                                            if (commandOutput == String.Empty)  // if by chance we reached this without setting a proper error message already
+                                                            {
+                                                                commandOutput =
+                                                                    String.Format( $"Error: SELECT was not successful for PlayoutID: {playoutId}");
+                                                            }
                                                         }
 
                                                     }
