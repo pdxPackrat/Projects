@@ -6,46 +6,26 @@ using System.Threading.Tasks;
 
 namespace RMS_Proofing
 {
-    public class AudioMath
+    /// <summary>Utility class that provides some Audio-related mathematical calculations
+    /// including RootMeanSquare and ConvertToDbfs (decibel FullScale, for digital audio)</summary>
+    public static class AudioMath
     {
-        private int numChannels;
 
-        public AudioMath(Int16 [] x, int channels)
-        {
-            this.numChannels = channels;
-
-        }
-
-        public AudioMath(Int32 [] x, int channels)
-        {
-            this.numChannels = channels;
-
-        }
-
-        public AudioMath(float [] x, int channels)
-        {
-            this.numChannels = channels;
-
-
-        }
-
-        /// <summary>
-        /// Just adding some comments to cause a potential merge conflict
-        /// </summary>
-        /// <param name="x"></param>
-        /// <returns></returns>
-        public static Int16 RootMeanSquare(Int16[] x)
+        /// <summary>  Calculates an "average" from a set of values, with a slight weighting towards larger values (nullified in this case by rounding performed at the end)</summary>
+        /// <param name="pcmData">  An array of type Int16 representing a set of audio PCM values</param>
+        /// <returns>Returns the RootMeanSquare value</returns>
+        public static Int16 RootMeanSquare(Int16[] pcmData)
         {
             double sum = 0;
             double temp = 0;
             Int16 result = 0;
 
-            for (int i = 0; i < x.Length; i++)
+            for (int i = 0; i < pcmData.Length; i++)
             {
-                sum += (x[i] * x[i]);
+                sum += (pcmData[i] * pcmData[i]);
             }
 
-            temp = Math.Round(Math.Sqrt(sum / x.Length));
+            temp = Math.Round(Math.Sqrt(sum / pcmData.Length));
 
             if (temp > Int16.MaxValue)
             {
@@ -57,18 +37,21 @@ namespace RMS_Proofing
             return result;
         }
 
-        public static Int32 RootMeanSquare(Int32[] x)
+        /// <summary>Calculates an "average" from a set of values, with a slight weighting towards larger values (nullified in this case by rounding performed at the end)</summary>
+        /// <param name="pcmData">An array of type Int32 representing a set of audio PCM values</param>
+        /// <returns>Returns the RootMeanSquare value</returns>
+        public static Int32 RootMeanSquare(Int32[] pcmData)
         {
             double sum = 0;
             double temp = 0;
             Int32 result = 0;
 
-            for (int i = 0; i < x.Length; i++)
+            for (int i = 0; i < pcmData.Length; i++)
             {
-                sum += (x[i] * x[i]);
+                sum += (pcmData[i] * pcmData[i]);
             }
 
-            temp = (Int32)(Math.Round(Math.Sqrt(sum / x.Length)));
+            temp = (Int32)(Math.Round(Math.Sqrt(sum / pcmData.Length)));
 
             if (temp > Int32.MaxValue)
             {
@@ -80,26 +63,23 @@ namespace RMS_Proofing
             return result;
         }
 
-        /// <summary>
-        /// Just adding some comments to cause a potential merge conflict
-        /// </summary>
-        /// <param name="x"></param>
-        /// <returns></returns>
-        public static float RootMeanSquare(float[] x)
+        /// <summary>Calculates an "average" from a set of values, with a slight weighting towards larger values (nullified in this case by rounding performed at the end)</summary>
+        /// <param name="ieeeFloatAudioData">An array of type Float that represents a set of audio sample data, converted to ieee Float</param>
+        /// <returns>Returns the RootMeanSquare value</returns>
+        public static float RootMeanSquare(float[] ieeeFloatAudioData)
         {
             float result = 0f;
 
-            result = RootMeanSquare(x, x.Length);
+            result = RootMeanSquare(ieeeFloatAudioData, ieeeFloatAudioData.Length);
 
             return result;
         }
 
-        /// <summary>
-        /// Just adding some comments to cause a potential merge conflict
-        /// </summary>
-        /// <param name="x"></param>
-        /// <returns></returns>
-        public static float RootMeanSquare(float[] inputData, int totalSamplesToCalculate)
+        /// <summary>Calculates an "average" from a set of values, with a slight weighting towards larger values (nullified in this case by rounding performed at the end)</summary>
+        /// <param name="ieeeFloatAudioData">An array of type Float that represents a set of audio sample data, converted to ieee Float</param>
+        /// <param name="totalSamplesToCalculate">Total number of samples (less than or equal to size of the Float array) to perform calculations against</param>
+        /// <returns>Returns the RootMeanSquare value</returns>
+        public static float RootMeanSquare(float[] ieeeFloatAudioData, int totalSamplesToCalculate)
         {
             double sum = 0;
             double temp = 0;
@@ -107,7 +87,7 @@ namespace RMS_Proofing
 
             for (int i = 0; i < totalSamplesToCalculate; i++)
             {
-                sum += (inputData[i] * inputData[i]);
+                sum += (ieeeFloatAudioData[i] * ieeeFloatAudioData[i]);
             }
 
             temp = (float)(Math.Sqrt(sum / totalSamplesToCalculate));
@@ -161,6 +141,9 @@ namespace RMS_Proofing
             return dbfs;
         }
 
+        /// <summary>Calculate dBFS based on previous RMS calculations</summary>
+        /// <param name="input">RMS value of type Int32</param>
+        /// <returns>A value between -90 and -0</returns>
         public static int ConvertToDbfs(float input)
         {
             int dbfs;
