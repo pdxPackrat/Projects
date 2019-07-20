@@ -424,13 +424,15 @@ namespace AcsListener
                                                         }
                                                         else
                                                         {
-                                                            if (commandOutput == String.Empty)  // if by chance we reached this without setting a proper error message already
+                                                            if (commandOutput == String.Empty) // if by chance we reached this without setting a proper error message already
                                                             {
-                                                                commandOutput =
-                                                                    String.Format( $"Error: SELECT was not successful for PlayoutID: {playoutId}");
+                                                                commandOutput = String.Format($"Error: SELECT was not successful for PlayoutID: {playoutId}");
                                                             }
                                                         }
-
+                                                    }
+                                                    catch (ArgumentException ex)  // Most likely the PlayoutId supplied does not exist
+                                                    {
+                                                        commandOutput = ex.Message;
                                                     }
                                                     catch (Exception ex)
                                                     {
@@ -710,6 +712,10 @@ namespace AcsListener
             rplLoadInfo.ClearCurrentPlayout();  // Sets the current PlayoutId to 0 and the IsPlayoutSelected will return false
         }
 
+        /// <summary>  Executes an AcspUpdateTimelineRequest to the ACS</summary>
+        /// <param name="timeOffsetInput">The time offset input.</param>
+        /// <param name="editRateInput">The edit rate input, as provided from data from the RPL file</param>
+        /// <returns>String containing any relevant output message back to the CommandProcess connection.</returns>
         private static string DoCommandTime(string timeOffsetInput, string editRateInput)
         {
             string outputMessage = "";
@@ -746,6 +752,8 @@ namespace AcsListener
             if (rplLoadInfo.IsPlayoutSelected is true)
             {
                 RplPlayoutData playoutData = rplLoadInfo.GetPlayoutData();
+
+                // Just a reminder that once the ACS has an updated timeline, its internal clock starts processing immediately
                 ProcessUpdateTimelineRrp(playoutData.PlayoutId, updatedEditUnits);
                 outputMessage = "TIME command issued with:\r\n" + " Time: " + timeOffsetInput + "\r\n EditRate: " + editRateInput + "\r\n EditUnits: " + updatedEditUnits;
             }
@@ -757,6 +765,12 @@ namespace AcsListener
             return outputMessage;
         }
 
+        /// <summary>
+        /// Sends an AcspSetOutputModeRequest FALSE to the ACS.
+        /// As a reminder, setting output to FALSE only ensures that the captions are turned off at the CaptiView device.
+        /// It doesn't actually "pause" any internal timer.
+        /// </summary>
+        /// <returns></returns>
         private static string DoCommandPause()
         {
             String outputMessage = "";
@@ -1615,7 +1629,7 @@ namespace AcsListener
 
                                 Byte[] bytes = new Byte[length];
                                 numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte SetRplLocationResponse successfully read from network stream");
+                                Log.Information( $"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte SetRplLocationResponse successfully read from network stream");
 
                                 AcspSetRplLocationResponse locationResponse = new AcspSetRplLocationResponse(bytes);
                                 Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {locationResponse.RequestId}");

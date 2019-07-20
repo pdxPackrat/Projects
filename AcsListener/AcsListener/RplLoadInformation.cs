@@ -87,6 +87,7 @@ namespace AcsListener
             if (containsKey is false)
             {
                 outputMessage = "No RPL found matching PlayoutID " + playoutId;
+                throw new ArgumentException(outputMessage);  // Get us back to the CommandProcess section where we can handle this
             }
             else
             {
