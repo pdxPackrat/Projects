@@ -54,6 +54,7 @@
     <Compile Include="ResourcePresentationList.cs" />
     <Compile Include="RplPlayoutId.cs" />
     <Compile Include="RplReelDuration.cs" />
+    <Compile Include="StringTrim.cs" />
     <Compile Include="Utf8StringWriter.cs" />
   </ItemGroup>
   <ItemGroup>
