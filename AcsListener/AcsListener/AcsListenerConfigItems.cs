@@ -1,21 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.Configuration;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Serilog;
 
 namespace AcsListener
 {
+    /// <summary>Class that represents all configuration items for the AcsListener application</summary>
     class AcsListenerConfigItems
     {
+        /// <summary>Initializes a new instance of the <see cref="AcsListenerConfigItems"/> class.</summary>
         public AcsListenerConfigItems()
         {
             ReadConfigItems();
         }
 
+        /// <summary>Reads the configuration items from the application config file.</summary>
         private void ReadConfigItems()
         {
             Log.Debug("Checking the application config file for any default keys");
@@ -38,7 +36,14 @@ namespace AcsListener
         }
 
         public int CommandPort { get; set; } = 13000;  // default port of 13000, arbitrary choice on our part
-        public int AcsPort { get; } = 4170;            // default port of 4170, per SMPTE 430-10:2010 specifications
+        public int AcsPort { get; } = 4170;            // default port of 4170, per SMPTE 430-10:2010 specifications, not a configurable value at this time
         public string RplUrlPath { get; set; } = "";   // default path to the RPL files that are stored on the system in a website
+
+        /// <summary>Converts to string.</summary>
+        /// <returns>A <see cref="System.String"/> that represents this instance.</returns>
+        public override string ToString()
+        {
+            return String.Format($"AcsListenerConfigItems: CommandPort: {CommandPort}, AcsPort: {AcsPort}, RplUrlPath: {RplUrlPath}");
+        }
     }
 }

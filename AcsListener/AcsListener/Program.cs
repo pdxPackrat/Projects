@@ -1045,7 +1045,7 @@ namespace AcsListener
                 Log.Information($"[Thread #: {thread.ManagedThreadId}] Connection Established! RemoteIP: {remoteAddress}");
                 ConnectedToAcs = true;   // set the static variable to true to let CommandProcess know if connection has occurred
 
-                // Presumably the ACS has establisted 
+                // Presumably the ACS has established 
 
                 if (stream != null)
                 {
