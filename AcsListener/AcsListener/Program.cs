@@ -46,12 +46,16 @@ namespace AcsListener
 
         // This next section represents static data that is stored at time of an RPL load action.  This should eventually
         // be moved to a static class to give greater control over how the data is set/read
-
         static RplLoadInformation rplLoadInfo = new RplLoadInformation();
         static RplLoadInformation rplReloadInfo;      // Set to rplLoadInfo if/when a new rplLoadInfo instance is created
 
         #endregion StaticData
 
+        /// <summary>
+        /// Defines the entry point of the application.
+        ///  In this case we are setting the Log configuration, and parsing for command line arguments (of which the only one we use is the -d option anymore).
+        /// </summary>
+        /// <param name="args">The arguments.</param>
         static void Main(string[] args)
         {
             // Configure the Serilog logger to write to console and file
@@ -860,6 +864,11 @@ namespace AcsListener
             return result;
         }
 
+        /// <summary>
+        /// Performs the "LOAD" command, checking first for a valid URL using the defaultRplUrlPath (which comes from loading the app.config at startup) and if that doesn't work, then just using the path supplied to the method.
+        /// </summary>
+        /// <param name="rplUrlPath">  The path to the ResourcePresentationList (RPL) file</param>
+        /// <returns>A string containing any of the results of the operation.</returns>
         private static string DoCommandLoad(string rplUrlPath)
         {
 
@@ -881,11 +890,11 @@ namespace AcsListener
                 }
             }
 
-            ResourcePresentationList XmlData;
+            ResourcePresentationList xmlData;
 
             try
             {
-                XmlData = LoadRplFromUrl(rplUrlPath);
+                xmlData = LoadRplFromUrl(rplUrlPath);
             }
             catch (ArgumentException ex)
             {
@@ -912,16 +921,16 @@ namespace AcsListener
 
             // Set the static data first, that is needed by the other commands
 
-            if (XmlData.PlayoutId == 0) // basically checking to make sure we didn't get an invalid load
+            if (xmlData.PlayoutId == 0) // basically checking to make sure we didn't get an invalid load
             {
                 return "Error:  RPL file was not loaded correctly.   PlayoutId is not a valid value";
             }
 
             RplPlayoutData playoutData = new RplPlayoutData();
 
-            playoutData.PlayoutId = XmlData.PlayoutId;
-            playoutData.TimelineOffset = XmlData.ReelResources.TimelineOffset;
-            playoutData.EditRate = XmlData.ReelResources.EditRate;
+            playoutData.PlayoutId = xmlData.PlayoutId;
+            playoutData.TimelineOffset = xmlData.ReelResources.TimelineOffset;
+            playoutData.EditRate = xmlData.ReelResources.EditRate;
             playoutData.ResourceUrl = rplUrlPath;
 
             RplReelDuration startingTimeline = new RplReelDuration("00:00:00", playoutData.EditRate);
@@ -940,11 +949,11 @@ namespace AcsListener
             Log.Information($"LOAD command issued successfully.");
             if (debugOutput is true)
             {
-                Log.Information($"PlayoutId:  {playoutData.PlayoutId}");
-                Log.Information($"timelineStart:  {playoutData.TimelineOffset}");
-                Log.Information($"editRate:  {playoutData.EditRate}");
-                Log.Information($"timelineEditUnits:  {timelineEditUnits}");
-                Log.Information($"resourceUrl:   {playoutData.ResourceUrl}");
+                Log.Verbose($"PlayoutId:  {playoutData.PlayoutId}");
+                Log.Verbose($"timelineStart:  {playoutData.TimelineOffset}");
+                Log.Verbose($"editRate:  {playoutData.EditRate}");
+                Log.Verbose($"timelineEditUnits:  {timelineEditUnits}");
+                Log.Verbose($"resourceUrl:   {playoutData.ResourceUrl}");
             }
 
             try
@@ -955,9 +964,6 @@ namespace AcsListener
             catch (ArgumentException ex)
             {
                 outputMessage = ex.Message;
-            }
-            finally
-            {
             }
 
             return outputMessage;
@@ -986,7 +992,7 @@ namespace AcsListener
                 "KILL   - Performs a STOP, and then terminates the lease\r\n";
 
             return outputMessage;
-}
+        }
 
         /// <summary>
         /// ListenerProcess is responsible handling most of the work of the AcsListener.  When a TCP connection is made, 
@@ -1168,55 +1174,45 @@ namespace AcsListener
             ConnectedToAcs = false;   // Set the flag to indicate that connection to/from the ACS has been terminated
         }
 
+        /// <summary>Loads the ResourcePresentationList (RPL) from the supplied URL in to memory and returns a deserialized reference to that object</summary>
+        /// <param name="rplUrlPath">  The path to the ResourcePresentationList</param>
+        /// <returns>The deserialized</returns>
         private static ResourcePresentationList LoadRplFromUrl(string rplUrlPath)
         {
             Log.Debug($"Attempting to load RPL file: {rplUrlPath}");
 
             // Define the XmlSerializer casting to be of type ResourcePresentationList
-            XmlSerializer Deserializer = new XmlSerializer(typeof(ResourcePresentationList));
-            ResourcePresentationList XmlData;
+            XmlSerializer deserializer = new XmlSerializer(typeof(ResourcePresentationList));
+            ResourcePresentationList xmlData;
 
             // Open a new WebClient to get the data from the target URL
             
-            WebClient client = new WebClient();
-
-            try
+            using (WebClient client = new WebClient())
             {
                 string data = Encoding.Default.GetString(client.DownloadData(rplUrlPath));
 
-                try
+                using (Stream memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(data)))
                 {
-                    Stream stream = new MemoryStream(Encoding.UTF8.GetBytes(data));
-
                     // Deserialize the input file
-                    object DeserializedData = Deserializer.Deserialize(stream);
+                    object deserializedData = deserializer.Deserialize(memoryStream);
 
                     // Cast the deserialized data to the SubtitleReel type
-                    XmlData = (ResourcePresentationList)DeserializedData;
+                    xmlData = (ResourcePresentationList)deserializedData;
 
-                    stream.Close();
-                }
-                finally
-                {
+                    memoryStream.Close();
                 }
             }
-            finally
-            {
-            }
-
-            // Close the input file stream
-            client.Dispose();
 
             // Send the deserialized data pointer back to the calling routine
             Log.Debug("Successfully loaded RPL data");
-            return XmlData;
+            return xmlData;
         }
 
 
         /// <summary>  This method will check a url to see that it does not return server or protocol errors</summary>
         /// <param name="url">  The path to check</param>
         /// <returns>
-        ///   <c>true</c> if [is URL valid] otherwise, <c>false</c>.</returns>
+        ///   <c>true</c> if [is URL valid], otherwise <c>false</c>.</returns>
         private static bool IsUrlValid(string url)
         {
             try
@@ -1252,16 +1248,15 @@ namespace AcsListener
             }
             catch (Exception ex)
             {
-                Log.Error($"Could not test url: {url}");
+                Log.Error($"Could not test url: {url}, Exception Message: {ex.Message}");
             }
 
             return false;
         }
 
 
-        /// <summary>
-        /// Sets Custom AcspLeaseTimer object
-        /// </summary>
+        /// <summary>Sets Custom AcspLeaseTimer object
+        /// to send GetStatus message to ACS on a regular frequency. </summary>
         /// <param name="leaseTimerMsec">Number of milliseconds between each Elapsed event</param>
         private static void SetLeaseTimer(uint leaseTimerMsec)
         {
@@ -1274,6 +1269,11 @@ namespace AcsListener
             Log.Information($"[Thread #{thread.ManagedThreadId}]: Setting a recurring GetStatusRequest callback every {leaseTimerMsec} msec");
         }
 
+        /// <summary>
+        /// Processes the Lease Timer event occuring (by default) every 30 seconds, sending a "heartbeat" message out to the ACS device to keep the TCP connection alive.   The ACS lease, defaulting to 60 seconds, keeps the TCP connection alive as long as some kind of message comes through before the lease expires.  If the lease expires, then the ACS will terminate any caption playback and attempt to re-establish connection to the playback system (AcsListener in this case), so obviously we want to keep the lease renewing as quickly as possible.  The SMPTE 430-10 specifications, per section 7.2.2 (Get New Lease) recommend sending the Get Status Request at a frequency of &lt;lease duration&gt; / 2 .
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The <see cref="ElapsedEventArgs"/> instance containing the event data.</param>
         private static void ProcessLeaseTimer(object sender, ElapsedEventArgs e)
         {
             NetworkStream leaseStream = ((AcspLeaseTimer)sender).Stream;   // leaseStream isn't used in this current version but not ready to obsolete it quite yet
@@ -1281,6 +1281,7 @@ namespace AcsListener
             ProcessGetStatusRrp();
         }
 
+        /// <summary>Processes the Announce RRP (Request and Response Pair)</summary>
         private static void ProcessAnnounceRrp()
         {
             Thread thread = Thread.CurrentThread;
@@ -1291,7 +1292,7 @@ namespace AcsListener
 
             if (debugOutput is true)
             {
-                Log.Debug($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+                Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
 
             CanWriteToStream.WaitOne();
@@ -1300,7 +1301,8 @@ namespace AcsListener
             // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
             if (stream.DataAvailable is true)
             {
-                stream.Flush();
+                int clearedBytes = stream.ClearStreamForNextMessage();
+                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
             }
 
             bool announcePairSuccessful = false;
@@ -1378,11 +1380,18 @@ namespace AcsListener
 
             if (debugOutput is true)
             {
-                Log.Debug($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+                Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
 
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+            if (stream.DataAvailable is true)
+            {
+                int clearedBytes = stream.ClearStreamForNextMessage();
+                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+            }
 
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
@@ -1466,11 +1475,18 @@ namespace AcsListener
 
             if (debugOutput is true)
             {
-                Log.Debug($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+                Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
 
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+            if (stream.DataAvailable is true)
+            {
+                int clearedBytes = stream.ClearStreamForNextMessage();
+                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+            }
 
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
@@ -1508,10 +1524,10 @@ namespace AcsListener
                         {
                             if (messageCounter > 0)
                             {
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] Debug Info: <previous message repeated {messageCounter} times");
+                                Log.Verbose($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] Debug Info: <previous message repeated {messageCounter} times");
                             }
                             messageCounter = 0;
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {thisMessage}");
+                            Log.Verbose($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {thisMessage}");
                             debugMessage = thisMessage;
                         }
                     }
@@ -1580,11 +1596,18 @@ namespace AcsListener
 
             if (debugOutput is true)
             {
-                Log.Debug($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+                Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
 
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+            if (stream.DataAvailable is true)
+            {
+                int clearedBytes = stream.ClearStreamForNextMessage();
+                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+            }
 
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
@@ -1657,7 +1680,6 @@ namespace AcsListener
 
         private static void ProcessSetOutputModeRrp(bool outputMode)
         {
-
             Thread thread = Thread.CurrentThread;
             const int timeoutValue = 10000;
             int numberOfBytes;
@@ -1667,11 +1689,18 @@ namespace AcsListener
 
             if (debugOutput is true)
             {
-                Log.Debug($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+                Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
 
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+            if (stream.DataAvailable is true)
+            {
+                int clearedBytes = stream.ClearStreamForNextMessage();
+                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+            }
 
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
@@ -1752,11 +1781,18 @@ namespace AcsListener
 
             if (debugOutput is true)
             {
-                Log.Debug($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+                Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
 
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+            if (stream.DataAvailable is true)
+            {
+                int clearedBytes = stream.ClearStreamForNextMessage();
+                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+            }
 
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
@@ -1838,11 +1874,18 @@ namespace AcsListener
 
             if (debugOutput is true)
             {
-                Log.Debug($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
+                Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
 
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
+
+            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+            if (stream.DataAvailable is true)
+            {
+                int clearedBytes = stream.ClearStreamForNextMessage();
+                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+            }
 
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
