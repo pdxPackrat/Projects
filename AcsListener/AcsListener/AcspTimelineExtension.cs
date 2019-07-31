@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+#pragma warning disable 169  // disable the CS0169 warning for the unused fields in AcspTimelineExtension
 
 namespace AcsListener
 {

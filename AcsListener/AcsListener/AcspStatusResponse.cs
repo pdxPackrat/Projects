@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace AcsListener
 {
@@ -34,7 +30,7 @@ namespace AcsListener
         {
             if (bytePack.Length < 5)
             {
-                throw new ArgumentOutOfRangeException("Error:  expected at least a 5-byte array to be passed to the Status Response constructor");
+                throw new ArgumentOutOfRangeException($"Error:  expected at least a 5-byte array to be passed to the Status Response constructor");
             }
 
             Byte[] lengthArray = new Byte[4];
@@ -91,10 +87,7 @@ namespace AcsListener
 
         public GeneralStatusResponseKey Key
         {
-            get
-            {
-                return _key;
-            }
+            get => _key;
         }
 
         public string Message
@@ -103,7 +96,7 @@ namespace AcsListener
             {
                 if (_message == null)
                 {
-                    throw new NullReferenceException("Error:  Status Response Message is null referenced");
+                    throw new NullReferenceException($"Error:  Status Response Message is null referenced");
                 }
                 return _message;
             }
