@@ -1045,11 +1045,11 @@ namespace AcsListener
 
             try
             {
-                IPEndPoint remoteEnd = (IPEndPoint)ListenerClient.Client.RemoteEndPoint;
+                IPEndPoint remoteEnd = (IPEndPoint) ListenerClient.Client.RemoteEndPoint;
                 IPAddress remoteAddress = remoteEnd.Address;
-                
+
                 Log.Information($"[Thread #: {thread.ManagedThreadId}] Connection Established! RemoteIP: {remoteAddress}");
-                ConnectedToAcs = true;   // set the static variable to true to let CommandProcess know if connection has occurred
+                ConnectedToAcs = true; // set the static variable to true to let CommandProcess know if connection has occurred
 
                 // Presumably the ACS has established 
 
@@ -1062,12 +1062,12 @@ namespace AcsListener
                 }
 
                 stream = ListenerClient.GetStream();
-                stream.WriteTimeout = timeoutValue;  // sets the timeout to X milliseconds
-                stream.ReadTimeout = timeoutValue;  // sets the  timeout to X milliseconds
+                stream.WriteTimeout = timeoutValue; // sets the timeout to X milliseconds
+                stream.ReadTimeout = timeoutValue; // sets the  timeout to X milliseconds
 
-                CanWriteToStream.Set();             // Finally, set the signal to indicate that the NetworkStream can be written to by other threads
+                CanWriteToStream.Set(); // Finally, set the signal to indicate that the NetworkStream can be written to by other threads
 
-                Thread.Sleep(2000);                 // Brief pause to give any other cleanup activity the chance to finish
+                Thread.Sleep(2000); // Brief pause to give any other cleanup activity the chance to finish
 
                 // Announce to ACS and get response, set lease with ACS, and finally get status from ACS.  All other actions handled by command process
                 ProcessAnnounceRrp();
@@ -1105,6 +1105,10 @@ namespace AcsListener
             {
                 Log.Error($"Error: Socket timeout of {timeoutValue} reached");
                 Log.Error($"Exception message: {ex.Message}");
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                Log.Error($"Error: An ArgumentException has occurred: {ex.Message}");
             }
             finally
             {
