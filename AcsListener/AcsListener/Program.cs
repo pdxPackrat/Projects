@@ -1302,22 +1302,22 @@ namespace AcsListener
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
 
-            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-            if (stream.DataAvailable is true)
-            {
-                int clearedBytes = stream.ClearStreamForNextMessage();
-                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
-            }
-
+            // Send the "Announce request" to the ACS system, and keep trying until a successful response is received
             bool announcePairSuccessful = false;
             while (announcePairSuccessful == false)
             {
+                // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+                if (stream.DataAvailable is true)
+                {
+                    int clearedBytes = stream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                }
 
-                // Send the "Announce request" to the ACS system
-
+                // Prepare a new AnnounceRequest data packet
                 AcspAnnounceRequest announceRequest = new AcspAnnounceRequest();
                 currentRequestId = announceRequest.RequestId;
 
+                // Send the AnnounceRequest data packet to the ACS
                 stream.Write(announceRequest.PackArray, 0, announceRequest.PackArray.Length);
                 Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]Announce Request sent to ACS.  RequestID #: {currentRequestId}");
 
@@ -1326,13 +1326,11 @@ namespace AcsListener
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
 
-
                 // Expecting an AnnounceResponse message
                 while (announcePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValue))
                 {
                     if (stream.DataAvailable == true)
                     {
-
                         numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
                         Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
@@ -1390,22 +1388,22 @@ namespace AcsListener
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
 
-            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-            if (stream.DataAvailable is true)
-            {
-                int clearedBytes = stream.ClearStreamForNextMessage();
-                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
-            }
-
+            // Send the "Get New Lease request" to the ACS system, and keep trying until a successful response is received
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
+                // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+                if (stream.DataAvailable is true)
+                {
+                    int clearedBytes = stream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                }
 
-                // Send the "Get New Lease request" to the ACS system
-
+                // Prepare the GetNewLeaseRequest data packet
                 AcspGetNewLeaseRequest leaseRequest = new AcspGetNewLeaseRequest(leaseSeconds);
                 currentRequestId = leaseRequest.RequestId;
 
+                // Send the GetNewLeaseRequest data packet to the ACS
                 stream.Write(leaseRequest.PackArray, 0, leaseRequest.PackArray.Length);
                 Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]GetNewLease Request for {leaseSeconds} seconds sent to ACS.  RequestID #: {currentRequestId}");
 
@@ -1419,7 +1417,6 @@ namespace AcsListener
                 {
                     if (stream.DataAvailable == true)
                     {
-
                         numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
                         Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
@@ -1485,24 +1482,22 @@ namespace AcsListener
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
 
-            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-            if (stream.DataAvailable is true)
-            {
-                int clearedBytes = stream.ClearStreamForNextMessage();
-                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
-            }
-
+            // Send the "GetStatusRequest " to the ACS system, and keep trying until a successful response is received
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
+                // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+                if (stream.DataAvailable is true)
+                {
+                    int clearedBytes = stream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                }
 
-                // Send the "GetStatusRequest " to the ACS system
-
+                // Prepare a new GetStatusRequest data packet
                 AcspGetStatusRequest statusRequest = new AcspGetStatusRequest();
                 currentRequestId = statusRequest.RequestId;
 
-                // Need to put in some code to check if there is data IN the stream waiting for us (which it shouldn't be) and FLUSH it if it is
-
+                // Send the GetStatusRequest data packet
                 stream.Write(statusRequest.PackArray, 0, statusRequest.PackArray.Length);
                 Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]GetStatus Request sent to ACS.  RequestID #: {currentRequestId}");
 
@@ -1590,7 +1585,6 @@ namespace AcsListener
 
         private static void ProcessSetRplLocationRrp(string resourceUrl, UInt32 playoutId)
         {
-
             Thread thread = Thread.CurrentThread;
             const int timeoutValue = 10000;
             int numberOfBytes;
@@ -1606,21 +1600,22 @@ namespace AcsListener
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
 
-            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-            if (stream.DataAvailable is true)
-            {
-                int clearedBytes = stream.ClearStreamForNextMessage();
-                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
-            }
-
+            // Send the "SetRplLocationRequest " to the ACS system, and keep trying until a successful response is received
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
-                // Send the "SetRplLocationRequest " to the ACS system
+                // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+                if (stream.DataAvailable is true)
+                {
+                    int clearedBytes = stream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                }
 
+                // Prepare the SetRplLocationRequest data packet
                 AcspSetRplLocationRequest rplRequest = new AcspSetRplLocationRequest(resourceUrl, playoutId);
                 currentRequestId = rplRequest.RequestId;
 
+                // Send the SetRplLocationRequest data packet to the ACS
                 stream.Write(rplRequest.PackArray, 0, rplRequest.PackArray.Length);
                 Log.Information($"[{DateTime.Now}]SetRplLocation Request sent to ACS.  RequestID #: {currentRequestId}");
 
@@ -1661,8 +1656,7 @@ namespace AcsListener
                                 AcspSetRplLocationResponse locationResponse = new AcspSetRplLocationResponse(bytes);
                                 Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {locationResponse.RequestId}");
 
-                                if ((locationResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful) || 
-                                    (locationResponse.StatusResponseKey == GeneralStatusResponseKey.Processing))
+                                if ((locationResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful) || (locationResponse.StatusResponseKey == GeneralStatusResponseKey.Processing))
                                 {
                                     messagePairSuccessful = true;
                                     Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {locationResponse.StatusResponseKeyString}");
@@ -1699,21 +1693,22 @@ namespace AcsListener
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
 
-            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-            if (stream.DataAvailable is true)
-            {
-                int clearedBytes = stream.ClearStreamForNextMessage();
-                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
-            }
-
+            // Send the "SetOutputModeRequest " to the ACS system, and keep trying until a successful response is received
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
-                // Send the "SetOutputModeRequest " to the ACS system
+                // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+                if (stream.DataAvailable is true)
+                {
+                    int clearedBytes = stream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                }
 
+                // Prepare the SetOutputModeRequest data packet
                 AcspSetOutputModeRequest outputModeRequest = new AcspSetOutputModeRequest(outputMode);
                 currentRequestId = outputModeRequest.RequestId;
 
+                // Send the SetOutputModeRequest data packet to the ACS
                 stream.Write(outputModeRequest.PackArray, 0, outputModeRequest.PackArray.Length);
                 Log.Information($"[{DateTime.Now}]SetOutputMode Request sent to ACS.  RequestID #: {currentRequestId}");
 
@@ -1782,7 +1777,6 @@ namespace AcsListener
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
-
             if (debugOutput is true)
             {
                 Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
@@ -1791,21 +1785,22 @@ namespace AcsListener
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
 
-            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-            if (stream.DataAvailable is true)
-            {
-                int clearedBytes = stream.ClearStreamForNextMessage();
-                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
-            }
-
+            // Send the "UpdateTimeline Request " to the ACS system, keep trying until we receive a successful response
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
-                // Send the "UpdateTimeline Request " to the ACS system
+                // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+                if (stream.DataAvailable is true)
+                {
+                    int clearedBytes = stream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                }
 
+                // Prepare the UpdateTimelineRequest data packet
                 AcspUpdateTimelineRequest updateTimelineRequest = new AcspUpdateTimelineRequest(testPlayoutId, timelineEditUnits);
                 currentRequestId = updateTimelineRequest.RequestId;
 
+                // Send the UpdateTimelineRequest data packet to the ACS
                 stream.Write(updateTimelineRequest.PackArray, 0, updateTimelineRequest.PackArray.Length);
                 Log.Information($"[{DateTime.Now}]UpdateTimeline Request sent to ACS.  RequestID #: {currentRequestId}");
 
@@ -1884,21 +1879,22 @@ namespace AcsListener
             CanWriteToStream.WaitOne();
             CanWriteToStream.Reset();  // Block the signal so that no other processes try to write to the stream at same time
 
-            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-            if (stream.DataAvailable is true)
-            {
-                int clearedBytes = stream.ClearStreamForNextMessage();
-                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
-            }
-
+            // Send the "TerminateLease Request " to the ACS system, keep trying until a successful response is received
             bool messagePairSuccessful = false;
             while (messagePairSuccessful == false)
             {
-                // Send the "TerminateLease Request " to the ACS system
+                // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+                if (stream.DataAvailable is true)
+                {
+                    int clearedBytes = stream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                }
 
+                // Prepare the TerminateLeaseRequest data packet
                 AcspTerminateLeaseRequest terminateLeaseRequest = new AcspTerminateLeaseRequest();
                 currentRequestId = terminateLeaseRequest.RequestId;
 
+                // Send the TerminateLeaseRequest data packet to the ACS
                 stream.Write(terminateLeaseRequest.PackArray, 0, terminateLeaseRequest.PackArray.Length);
                 Log.Information($"[{DateTime.Now}]TerminateLease Request sent to ACS.  RequestID #: {currentRequestId}");
 
