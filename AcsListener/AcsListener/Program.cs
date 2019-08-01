@@ -29,25 +29,25 @@ namespace AcsListener
     class Program
     {
         #region StaticData
-        private static Int32 defaultAcsPort = 4170;       // Per SMPTE 430-10:2010 specifications
-        private static Int32 defaultCommandPort = 13000;  // Arbitrary port choice, but appears to be unassigned at the moment according to
+        private static Int32 DefaultAcsPort = 4170;       // Per SMPTE 430-10:2010 specifications
+        private static Int32 DefaultCommandPort = 13000;  // Arbitrary port choice, but appears to be unassigned at the moment according to
                                                           // www.iana.org/assignments/service-names-port-numbers
-        private static string defaultRplUrlPath = "";
+        private static string DefaultRplUrlPath = "";
 
-        private static AcspLeaseTimer leaseTimer;
+        private static AcspLeaseTimer LeaseTimer;
         private static ManualResetEvent CanWriteToStream = new ManualResetEvent(false);
         private static bool ConnectedToAcs = false;
         private static bool KillCommandReceived = false;
-        private static NetworkStream stream;
+        private static NetworkStream ListenerStream;
         private static TcpClient ListenerClient;
 
-        static UInt32 currentRequestId = 0; // Tracks the current RequestID number that has been sent to the ACS
-        static bool debugOutput = false;
+        static UInt32 CurrentRequestId = 0; // Tracks the current RequestID number that has been sent to the ACS
+        static bool DebugOutput = false;
 
         // This next section represents static data that is stored at time of an RPL load action.  This should eventually
         // be moved to a static class to give greater control over how the data is set/read
-        static RplLoadInformation rplLoadInfo = new RplLoadInformation();
-        static RplLoadInformation rplReloadInfo;      // Set to rplLoadInfo if/when a new rplLoadInfo instance is created
+        static RplLoadInformation RplLoadInfo = new RplLoadInformation();
+        static RplLoadInformation RplReloadInfo;      // Set to RplLoadInfo if/when a new RplLoadInfo instance is created
 
         #endregion StaticData
 
@@ -84,11 +84,11 @@ namespace AcsListener
 
             AcsListenerConfigItems myConfig = new AcsListenerConfigItems();
 
-            defaultAcsPort = myConfig.AcsPort;
-            defaultCommandPort = myConfig.CommandPort;
-            defaultRplUrlPath = myConfig.RplUrlPath;
+            DefaultAcsPort = myConfig.AcsPort;
+            DefaultCommandPort = myConfig.CommandPort;
+            DefaultRplUrlPath = myConfig.RplUrlPath;
 
-            debugOutput = options.DebugOutput;
+            DebugOutput = options.DebugOutput;
 
             // Don't need this section anymore as these command line parameters have been obsoleted and shifted over to the command telnet connection
             /*
@@ -102,8 +102,8 @@ namespace AcsListener
 
             IPAddress localAddress = IPAddress.Any;
 
-            TcpListener listenerAcs = new TcpListener(localAddress, defaultAcsPort);
-            TcpListener listenerCommand = new TcpListener(localAddress, defaultCommandPort);
+            TcpListener listenerAcs = new TcpListener(localAddress, DefaultAcsPort);
+            TcpListener listenerCommand = new TcpListener(localAddress, DefaultCommandPort);
 
             listenerAcs.Start();
             listenerCommand.Start();
@@ -192,12 +192,12 @@ namespace AcsListener
             ListenerProcessParams processParams = new ListenerProcessParams(client);
 
             // Depending on which port connected (ACS or Command) queue a thread for that process
-            if (localEndPort == defaultAcsPort)
+            if (localEndPort == DefaultAcsPort)
             {
                 ThreadPool.QueueUserWorkItem(ListenerProcess, processParams);
             }
             
-            if (localEndPort == defaultCommandPort)
+            if (localEndPort == DefaultCommandPort)
             {
                 ThreadPool.QueueUserWorkItem(CommandProcess, processParams);
             }
@@ -358,9 +358,9 @@ namespace AcsListener
                                                 else
                                                 {
                                                     // Some basic validation on our part here to make sure that the RPL has been loaded first
-                                                    if (rplLoadInfo.IsPlayoutSelected is true)
+                                                    if (RplLoadInfo.IsPlayoutSelected is true)
                                                     {
-                                                        RplPlayoutData playoutData = rplLoadInfo.GetPlayoutData();
+                                                        RplPlayoutData playoutData = RplLoadInfo.GetPlayoutData();
 
                                                         if (playoutData.EditRate != "")
                                                         {
@@ -397,9 +397,9 @@ namespace AcsListener
                                                     {
                                                         playoutId = UInt32.Parse(commandParameter);
 
-                                                        if (rplLoadInfo.IsPlayoutSelected is true)
+                                                        if (RplLoadInfo.IsPlayoutSelected is true)
                                                         {
-                                                            if (rplLoadInfo.GetCurrentPlayout() != playoutId)
+                                                            if (RplLoadInfo.GetCurrentPlayout() != playoutId)
                                                             {
                                                                 // If there is a current playout selected already, and the about-to-be-selected playout is different
                                                                 // then before we do any selections of the new playout, we need to pause the current playout.
@@ -410,9 +410,9 @@ namespace AcsListener
                                                         commandOutput = commandOutput + DoCommandSelect(playoutId);
 
                                                         // Some basic validation on our part here to make sure that the RPL has been loaded first
-                                                        if (rplLoadInfo.IsPlayoutSelected is true)
+                                                        if (RplLoadInfo.IsPlayoutSelected is true)
                                                         {
-                                                            RplPlayoutData playoutData = rplLoadInfo.GetPlayoutData();
+                                                            RplPlayoutData playoutData = RplLoadInfo.GetPlayoutData();
 
                                                             if (playoutData.EditRate != "")
                                                             {
@@ -450,7 +450,7 @@ namespace AcsListener
 
                                             case "UNLOAD":
                                                 // First, confirm that there is even a need for the unload command
-                                                if (rplLoadInfo.LoadCount <= 0)
+                                                if (RplLoadInfo.LoadCount <= 0)
                                                 {
                                                     commandOutput = "UNLOAD action skipped, there are no RPLs loaded at this time";
                                                     break;
@@ -472,9 +472,9 @@ namespace AcsListener
                                                         playoutId = UInt32.Parse(commandParameter);
 
                                                         // Next check to see if a Playout has been selected
-                                                        if (rplLoadInfo.IsPlayoutSelected is true)
+                                                        if (RplLoadInfo.IsPlayoutSelected is true)
                                                         {
-                                                            if (rplLoadInfo.GetCurrentPlayout() == playoutId)
+                                                            if (RplLoadInfo.GetCurrentPlayout() == playoutId)
                                                             {
                                                                 // If there is a current playout selected already, and the about-to-be-unloaded playout is the same
                                                                 // then before we do anything else, we need to perform a STOP command first before we UNLOAD the RPL
@@ -598,19 +598,19 @@ namespace AcsListener
         {
             string outputMessage = "RELOAD not possible as there are no RPLs to reload";
 
-            if (rplReloadInfo != null)
+            if (RplReloadInfo != null)
             {
-                if (rplReloadInfo.LoadCount > 0)
+                if (RplReloadInfo.LoadCount > 0)
                 {
                     outputMessage = "Processing RELOAD command: \r\n";
-                    foreach(string UrlToReload in rplReloadInfo.GetRplUrlList())
+                    foreach(string urlToReload in RplReloadInfo.GetRplUrlList())
                     {
-                        outputMessage = outputMessage + DoCommandLoad(UrlToReload) + "\r\n";
+                        outputMessage = outputMessage + DoCommandLoad(urlToReload) + "\r\n";
                     }
 
-                    // After successful RELOAD, we "ZERO" out the rplReloadInfo  
+                    // After successful RELOAD, we "ZERO" out the RplReloadInfo  
                     // so that another RELOAD with the same data is not possible
-                    rplReloadInfo = new RplLoadInformation();
+                    RplReloadInfo = new RplLoadInformation();
                 }
             }
 
@@ -630,7 +630,7 @@ namespace AcsListener
 
             try
             {
-                outputMessage = rplLoadInfo.RemoveRplData(playoutId);
+                outputMessage = RplLoadInfo.RemoveRplData(playoutId);
             }
             catch (Exception ex)
             {
@@ -645,7 +645,7 @@ namespace AcsListener
 
         /// <summary>
         /// DoCommandSelect is the action method associated with the SELECT command in the CommandProcessor. 
-        /// It calls the SetCurrentPlayout method of the static rplLoadInfo object, all else is handled internally
+        /// It calls the SetCurrentPlayout method of the static RplLoadInfo object, all else is handled internally
         /// from that object.  
         /// </summary>
         /// <param name="playoutId">A unique number between 10000000 and 99999999, generated for the RPL at time of RPL creation.</param>
@@ -654,14 +654,14 @@ namespace AcsListener
         {
             string outputMessage;
 
-            outputMessage = rplLoadInfo.SetCurrentPlayout(playoutId);
+            outputMessage = RplLoadInfo.SetCurrentPlayout(playoutId);
 
             return outputMessage;
         }
 
         /// <summary>
         /// DoCommandList is the action method associated with the LIST command for the CommandProcessor.  
-        /// It calls the GetRplLoadList() method of the static rplLoadInfo object, which returns a list of RPLs that are
+        /// It calls the GetRplLoadList() method of the static RplLoadInfo object, which returns a list of RPLs that are
         /// currently loaded in to memory in the AcsListener. 
         /// </summary>
         /// <returns></returns>
@@ -671,9 +671,9 @@ namespace AcsListener
 
             if (ConnectedToAcs is true)
             {
-                if (rplLoadInfo.LoadCount > 0)
+                if (RplLoadInfo.LoadCount > 0)
                 {
-                    outputMessage = rplLoadInfo.GetRplLoadList();
+                    outputMessage = RplLoadInfo.GetRplLoadList();
                 }
                 else
                 {
@@ -695,7 +695,7 @@ namespace AcsListener
         /// <returns></returns>
         private static string DoCommandStop()
         {
-            if (rplLoadInfo.IsPlayoutSelected is true)
+            if (RplLoadInfo.IsPlayoutSelected is true)
             {
                 ProcessSetOutputModeRrp(false);
                 ClearRplSelectedPlayout();
@@ -708,12 +708,12 @@ namespace AcsListener
         }
 
         /// <summary>
-        /// ClearRplSelectedPlayout uses the "ClearCurrentPlayout" method of the static rplLoadInfo data object and sets
-        /// the current PlayoutId to 0, and the IsPlayoutSelected property to false, all handled internally by the rplLoadInfo object. 
+        /// ClearRplSelectedPlayout uses the "ClearCurrentPlayout" method of the static RplLoadInfo data object and sets
+        /// the current PlayoutId to 0, and the IsPlayoutSelected property to false, all handled internally by the RplLoadInfo object. 
         /// </summary>
         private static void ClearRplSelectedPlayout()
         {
-            rplLoadInfo.ClearCurrentPlayout();  // Sets the current PlayoutId to 0 and the IsPlayoutSelected will return false
+            RplLoadInfo.ClearCurrentPlayout();  // Sets the current PlayoutId to 0 and the IsPlayoutSelected will return false
         }
 
         /// <summary>  Executes an AcspUpdateTimelineRequest to the ACS</summary>
@@ -753,9 +753,9 @@ namespace AcsListener
             }
 
             // Some basic validation that we have a successfully loaded RPL
-            if (rplLoadInfo.IsPlayoutSelected is true)
+            if (RplLoadInfo.IsPlayoutSelected is true)
             {
-                RplPlayoutData playoutData = rplLoadInfo.GetPlayoutData();
+                RplPlayoutData playoutData = RplLoadInfo.GetPlayoutData();
 
                 // Just a reminder that once the ACS has an updated timeline, its internal clock starts processing immediately
                 ProcessUpdateTimelineRrp(playoutData.PlayoutId, updatedEditUnits);
@@ -781,13 +781,13 @@ namespace AcsListener
             // Need some additional logic here to handle whether an RPL has already been loaded or not
 
             // check to make sure that the NetworkStream is already set by the initial connection
-            if ((ConnectedToAcs is true) && (stream != null))
+            if ((ConnectedToAcs is true) && (ListenerStream != null))
             {
                 // Check to make sure that we have a PlayoutId chosen by the SELECT command
                 // as per SMPTE 430-10, we must have already performed a SetRplLocation and an UpdateTimeline before we can set
                 // the OutputMode to TRUE. 
 
-                if (rplLoadInfo.IsPlayoutSelected is true)
+                if (RplLoadInfo.IsPlayoutSelected is true)
                 {
                     ProcessSetOutputModeRrp(false);
                     outputMessage = "ACS instructed to set OutputMode to FALSE";
@@ -813,13 +813,13 @@ namespace AcsListener
             // Need some additional logic here to handle whether an RPL has already been loaded or not
 
             // check to make sure that the NetworkStream is already set by the initial connection
-            if ((ConnectedToAcs is true) && (stream != null))
+            if ((ConnectedToAcs is true) && (ListenerStream != null))
             {
                 // Check to make sure that we have a PlayoutId chosen by the SELECT command
                 // as per SMPTE 430-10, we must have already performed a SetRplLocation and an UpdateTimeline before we can set
                 // the OutputMode to TRUE. 
 
-                if (rplLoadInfo.IsPlayoutSelected is true)
+                if (RplLoadInfo.IsPlayoutSelected is true)
                 {
                     ProcessSetOutputModeRrp(true);
                     outputMessage = "ACS instructed to set OutputMode to TRUE";
@@ -846,9 +846,9 @@ namespace AcsListener
             {
                 result = "ACS: connected; Current Playout: ";
 
-                if (rplLoadInfo.GetCurrentPlayout() > 0)
+                if (RplLoadInfo.GetCurrentPlayout() > 0)
                 {
-                    RplPlayoutData playoutData = rplLoadInfo.GetPlayoutData();
+                    RplPlayoutData playoutData = RplLoadInfo.GetPlayoutData();
                     result = result + playoutData.PlayoutId + " ( " + playoutData.ResourceUrl + " )";
                 }
                 else
@@ -865,7 +865,7 @@ namespace AcsListener
         }
 
         /// <summary>
-        /// Performs the "LOAD" command, checking first for a valid URL using the defaultRplUrlPath (which comes from loading the app.config at startup) and if that doesn't work, then just using the path supplied to the method.
+        /// Performs the "LOAD" command, checking first for a valid URL using the DefaultRplUrlPath (which comes from loading the app.config at startup) and if that doesn't work, then just using the path supplied to the method.
         /// </summary>
         /// <param name="rplUrlPath">  The path to the ResourcePresentationList (RPL) file</param>
         /// <returns>A string containing any of the results of the operation.</returns>
@@ -876,17 +876,17 @@ namespace AcsListener
 
             string outputMessage = "";
 
-            if (defaultRplUrlPath != String.Empty)
+            if (DefaultRplUrlPath != String.Empty)
             {
-                Log.Debug($"Detected default RPL path. Testing whether a modified url path is valid: {defaultRplUrlPath + rplUrlPath}");
-                if (IsUrlValid(defaultRplUrlPath + rplUrlPath))
+                Log.Debug($"Detected default RPL path. Testing whether a modified url path is valid: {DefaultRplUrlPath + rplUrlPath}");
+                if (IsUrlValid(DefaultRplUrlPath + rplUrlPath))
                 {
-                    rplUrlPath = defaultRplUrlPath + rplUrlPath;
+                    rplUrlPath = DefaultRplUrlPath + rplUrlPath;
                     Log.Debug($"Confirmed that modified path is valid: {rplUrlPath}");
                 }
                 else
                 {
-                    Log.Debug($"Modified path is not valid: {defaultRplUrlPath + rplUrlPath}");
+                    Log.Debug($"Modified path is not valid: {DefaultRplUrlPath + rplUrlPath}");
                 }
             }
 
@@ -947,7 +947,7 @@ namespace AcsListener
             // Special note here - this is just a LOAD action, not a SELECT, so no timeline update at this point
 
             Log.Information($"LOAD command issued successfully.");
-            if (debugOutput is true)
+            if (DebugOutput is true)
             {
                 Log.Verbose($"PlayoutId:  {playoutData.PlayoutId}");
                 Log.Verbose($"timelineStart:  {playoutData.TimelineOffset}");
@@ -958,7 +958,7 @@ namespace AcsListener
 
             try
             {
-                rplLoadInfo.InsertRplData(playoutData);
+                RplLoadInfo.InsertRplData(playoutData);
                 outputMessage = "LOAD command issued successfully for: " + playoutData.ResourceUrl + "\r\n" + " PlayoutId #: " + playoutData.PlayoutId;
             }
             catch (ArgumentException ex)
@@ -1040,7 +1040,7 @@ namespace AcsListener
                     //    4) Close the existing TCP connection
 
 
-                    if (stream != null)
+                    if (ListenerStream != null)
                     {
                         try
                         {
@@ -1048,12 +1048,12 @@ namespace AcsListener
                             CanWriteToStream.Reset(); // Disable writing to the ACS NetworkStream for any other thread
 
                             // Close and dispose of the ACS NetworkStream
-                            stream?.Close(); 
-                            stream?.Dispose();
+                            ListenerStream?.Close(); 
+                            ListenerStream?.Dispose();
                         }
                         finally
                         {
-                            stream = null; // Null out the static ACS NetworkStream
+                            ListenerStream = null; // Null out the static ACS NetworkStream
                         }
                     }
 
@@ -1063,7 +1063,7 @@ namespace AcsListener
 
                 // Since we have proven it is an ACS talking to us, this will become the new ACS connection
                 ListenerClient = tempTcpClient;  
-                stream = tempStream;
+                ListenerStream = tempStream;
                 ConnectedToAcs = true; // set the static variable to true to let CommandProcess know if connection has occurred
 
                 KillCommandReceived = false; // Initialize the control logic, only set to true by DoCommandKill()
@@ -1072,8 +1072,8 @@ namespace AcsListener
                 ProcessGetNewLeaseRrp(leaseSeconds);
                 ProcessGetStatusRrp();
 
-                // As this is a new instance of ACS connection, start up a new instance of the rplLoadInfo static data
-                rplLoadInfo = new RplLoadInformation();
+                // As this is a new instance of ACS connection, start up a new instance of the RplLoadInfo static data
+                RplLoadInfo = new RplLoadInformation();
 
                 SetLeaseTimer((leaseSeconds * 1000) / 2); // Convert to milliseconds and then halve the number
 
@@ -1095,9 +1095,6 @@ namespace AcsListener
                     Log.Information($"[Thread #{thread.ManagedThreadId}]  Lost TCP connection with ACS!  Cleaning everything else up and waiting for new connection/lease.");
                 }
 
-                /*   I don't think we need this section right now, because DoAcsConnectionCleanup() does something similar
-                stream = null;   // Null set the NetworkStream object so that it is again available for next connection
-                */
             }
             catch (IOException ex)
             {
@@ -1110,7 +1107,7 @@ namespace AcsListener
                 Log.Error($"[Thread #{thread.ManagedThreadId}] Error: An ArgumentException has occurred: {ex.Message}");
                 DoAcsConnectionCleanup();
             }
-            catch (ObjectDisposedException ex) // likely to occur when the NetworkStream object "stream" has been cleaned up but another thread is trying to access
+            catch (ObjectDisposedException ex) // likely to occur when the NetworkStream object "ListenerStream" has been cleaned up but another thread is trying to access
             {
                 Log.Error($"[Thread #{thread.ManagedThreadId}] Error: An ObjectDisposedException has occurred: {ex.Message}");
                 DoAcsConnectionCleanup();
@@ -1140,33 +1137,33 @@ namespace AcsListener
         {
             Thread thread = Thread.CurrentThread;
 
-            if (leaseTimer != null)
+            if (LeaseTimer != null)
             {
                 try
                 {
                     Log.Information($"[Thread #{thread.ManagedThreadId}] Attempting to stop the Lease Timer ...");
-                    leaseTimer.Stop();
-                    leaseTimer.Dispose();
+                    LeaseTimer.Stop();
+                    LeaseTimer.Dispose();
                 }
                 finally
                 {
-                    leaseTimer = null;
+                    LeaseTimer = null;
                     Log.Information($"[Thread #{thread.ManagedThreadId}] Lease Timer has been stopped and closed");
                 }
             }
 
-            if (stream != null)
+            if (ListenerStream != null)
             {
                 try
                 {
                     Log.Information($"[Thread #{thread.ManagedThreadId}] Attempting to close the NetworkStream and close the overall ACS TCP connection");
                     CanWriteToStream.WaitOne(1000);
                     CanWriteToStream.Reset();    // Block so that nothing else attempts to write to the stream
-                    stream.Close();
+                    ListenerStream.Close();
                 }
                 finally
                 {
-                    stream = null;
+                    ListenerStream = null;
                     Log.Information($"[Thread #{thread.ManagedThreadId}] Successfully closed the NetworkStream and closed the overall ACS TCP connection");
                 }
             }
@@ -1192,16 +1189,16 @@ namespace AcsListener
                 }
             }
 
-            // Prepare to clear out the rplLoadInfo static data, but before we do, if there are any RPLs loaded, we will save that off for possible RELOAD
-            if (rplLoadInfo != null)
+            // Prepare to clear out the RplLoadInfo static data, but before we do, if there are any RPLs loaded, we will save that off for possible RELOAD
+            if (RplLoadInfo != null)
             {
-                if (rplLoadInfo.LoadCount > 0)
+                if (RplLoadInfo.LoadCount > 0)
                 {
-                    rplReloadInfo = rplLoadInfo;
-                    Log.Information($"[Thread #: {thread.ManagedThreadId}] Storing [{rplLoadInfo.LoadCount}] existing RPL information for RELOAD command use.");
+                    RplReloadInfo = RplLoadInfo;
+                    Log.Information($"[Thread #: {thread.ManagedThreadId}] Storing [{RplLoadInfo.LoadCount}] existing RPL information for RELOAD command use.");
                 }
             }
-            rplLoadInfo = new RplLoadInformation();   // effectively clear out the static RPL information
+            RplLoadInfo = new RplLoadInformation();   // effectively clear out the static RPL information
 
             ConnectedToAcs = false;   // Set the flag to indicate that connection to/from the ACS has been terminated
         }
@@ -1293,10 +1290,10 @@ namespace AcsListener
         private static void SetLeaseTimer(uint leaseTimerMsec)
         {
             Thread thread = Thread.CurrentThread;
-            leaseTimer = new AcspLeaseTimer(stream, leaseTimerMsec);
+            LeaseTimer = new AcspLeaseTimer(ListenerStream, leaseTimerMsec);
 
-            leaseTimer.Elapsed += ProcessLeaseTimer;
-            leaseTimer.Start();
+            LeaseTimer.Elapsed += ProcessLeaseTimer;
+            LeaseTimer.Start();
 
             Log.Information($"[Thread #{thread.ManagedThreadId}]: Setting a recurring GetStatusRequest callback every {leaseTimerMsec} msec");
         }
@@ -1321,7 +1318,7 @@ namespace AcsListener
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
-            if (debugOutput is true)
+            if (DebugOutput is true)
             {
                 Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
@@ -1336,16 +1333,16 @@ namespace AcsListener
             if (inputStream.DataAvailable is true)
             {
                 int clearedBytes = inputStream.ClearStreamForNextMessage();
-                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
             }
 
             // Prepare a new AnnounceRequest data packet
             AcspAnnounceRequest announceRequest = new AcspAnnounceRequest();
-            currentRequestId = announceRequest.RequestId;
+            CurrentRequestId = announceRequest.RequestId;
 
             // Send the AnnounceRequest data packet to the ACS
             inputStream.Write(announceRequest.PackArray, 0, announceRequest.PackArray.Length);
-            Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]Announce Request sent to ACS.  RequestID #: {currentRequestId}");
+            Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]Announce Request sent to ACS.  RequestID #: {CurrentRequestId}");
 
             // Wait for AnnounceResponse from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
@@ -1358,40 +1355,40 @@ namespace AcsListener
                 if (inputStream.DataAvailable == true)
                 {
                     var numberOfBytes = inputStream.Read(header, 0, header.Length);
-                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
+                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
                     AcspResponseHeader announceResponseHeader = new AcspResponseHeader(header);
                     if (announceResponseHeader.Key.IsBadRequest)
                     {
-                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: AnnounceResponse [Bad Message] received from ACS!");
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: AnnounceResponse [Bad Message] received from ACS!");
                         // Need some control logic here to figure out how to handle a Bad Request message
                     }
 
                     if (announceResponseHeader.Key.IsGoodRequest)
                     {
-                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good AnnounceResponse received from ACS!");
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Good AnnounceResponse received from ACS!");
                         int length = announceResponseHeader.PackLength.Length;
 
                         Byte[] bytes = new Byte[length];
                         numberOfBytes = inputStream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte AnnounceResponse successfully read from network stream");
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {numberOfBytes}-byte AnnounceResponse successfully read from network stream");
 
                         AcspAnnounceResponse announceResponse = new AcspAnnounceResponse(bytes);
-                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {announceResponse.RequestId}");
-                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: DeviceDescription is: {announceResponse.DeviceDescription}");
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: RequestId is: {announceResponse.RequestId}");
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: DeviceDescription is: {announceResponse.DeviceDescription}");
 
                         // Check for RrpSuccesful code and matching RequestId values
-                        if ((announceResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful) && (currentRequestId == announceResponse.RequestId))
+                        if ((announceResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful) && (CurrentRequestId == announceResponse.RequestId))
                         {
                             announcePairSuccessful = true;
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: RrpSuccessful");
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Response Received: RrpSuccessful");
                         }
                         else
                         {
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {announceResponse.StatusResponseKeyString}");
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Response Received: {announceResponse.StatusResponseKeyString}");
                         }
                     }
-                } // end if (stream.DataAvailable == true) 
+                } // end if (ListenerStream.DataAvailable == true) 
                 else
                 {
                     Thread.Sleep(100);  // Since there was no data yet, wait 100ms and try again
@@ -1415,7 +1412,7 @@ namespace AcsListener
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
 
-            if (debugOutput is true)
+            if (DebugOutput is true)
             {
                 Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
@@ -1428,19 +1425,19 @@ namespace AcsListener
             while (messagePairSuccessful == false)
             {
                 // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-                if (stream.DataAvailable is true)
+                if (ListenerStream.DataAvailable is true)
                 {
-                    int clearedBytes = stream.ClearStreamForNextMessage();
-                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                    int clearedBytes = ListenerStream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
                 }
 
                 // Prepare the GetNewLeaseRequest data packet
                 AcspGetNewLeaseRequest leaseRequest = new AcspGetNewLeaseRequest(leaseSeconds);
-                currentRequestId = leaseRequest.RequestId;
+                CurrentRequestId = leaseRequest.RequestId;
 
                 // Send the GetNewLeaseRequest data packet to the ACS
-                stream.Write(leaseRequest.PackArray, 0, leaseRequest.PackArray.Length);
-                Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]GetNewLease Request for {leaseSeconds} seconds sent to ACS.  RequestID #: {currentRequestId}");
+                ListenerStream.Write(leaseRequest.PackArray, 0, leaseRequest.PackArray.Length);
+                Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]GetNewLease Request for {leaseSeconds} seconds sent to ACS.  RequestID #: {CurrentRequestId}");
 
                 // Wait for AnnounceResponse from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
@@ -1450,47 +1447,47 @@ namespace AcsListener
                 // Expecting a GetNewLeaseResponse message
                 while (messagePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValue))
                 {
-                    if (stream.DataAvailable == true)
+                    if (ListenerStream.DataAvailable == true)
                     {
-                        numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
-                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
+                        numberOfBytes = ListenerStream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader announceResponseHeader = new AcspResponseHeader(header);
                         if (announceResponseHeader.Key.IsBadRequest)
                         {
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: GetNewLeaseResponse [Bad Message] received from ACS!");
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: GetNewLeaseResponse [Bad Message] received from ACS!");
                             // Need some control logic here to figure out how to handle a Bad Request message
                         }
 
                         if (announceResponseHeader.Key.IsGoodRequest)
                         {
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good GetNewLeaseResponse received from ACS!");
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Good GetNewLeaseResponse received from ACS!");
 
                             if (announceResponseHeader.Key.NodeNames == Byte13NodeNames.GetNewLeaseResponse)
                             {
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Expected GetNewLeaseResponse has been received");
+                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Expected GetNewLeaseResponse has been received");
 
                                 int length = announceResponseHeader.PackLength.Length;
 
                                 Byte[] bytes = new Byte[length];
-                                numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte GetNewLeaseResponse successfully read from network stream");
+                                numberOfBytes = ListenerStream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
+                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {numberOfBytes}-byte GetNewLeaseResponse successfully read from network stream");
 
                                 AcspGetNewLeaseResponse leaseResponse = new AcspGetNewLeaseResponse(bytes);
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {leaseResponse.RequestId}");
+                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: RequestId is: {leaseResponse.RequestId}");
 
                                 if (leaseResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful)
                                 {
                                     messagePairSuccessful = true;
-                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: RrpSuccessful");
+                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Response Received: RrpSuccessful");
                                 }
                                 else
                                 {
-                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {leaseResponse.StatusResponseKeyString}");
+                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Response Received: {leaseResponse.StatusResponseKeyString}");
                                 }
                             }
                         }
-                    }  // if (stream.DataAvailable == true)
+                    }  // if (ListenerStream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
 
             }  // end while(messagePairSuccessful == false)
@@ -1509,7 +1506,7 @@ namespace AcsListener
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
-            if (debugOutput is true)
+            if (DebugOutput is true)
             {
                 Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
@@ -1522,19 +1519,19 @@ namespace AcsListener
             while (messagePairSuccessful == false)
             {
                 // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-                if (stream.DataAvailable is true)
+                if (ListenerStream.DataAvailable is true)
                 {
-                    int clearedBytes = stream.ClearStreamForNextMessage();
-                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                    int clearedBytes = ListenerStream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
                 }
 
                 // Prepare a new GetStatusRequest data packet
                 AcspGetStatusRequest statusRequest = new AcspGetStatusRequest();
-                currentRequestId = statusRequest.RequestId;
+                CurrentRequestId = statusRequest.RequestId;
 
                 // Send the GetStatusRequest data packet
-                stream.Write(statusRequest.PackArray, 0, statusRequest.PackArray.Length);
-                Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]GetStatus Request sent to ACS.  RequestID #: {currentRequestId}");
+                ListenerStream.Write(statusRequest.PackArray, 0, statusRequest.PackArray.Length);
+                Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]GetStatus Request sent to ACS.  RequestID #: {CurrentRequestId}");
 
                 // Wait for GetStatusResponse from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
@@ -1547,7 +1544,7 @@ namespace AcsListener
                 // Expecting a GetStatusResponse message
                 while (messagePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValue))
                 {
-                    if (debugOutput is true)
+                    if (DebugOutput is true)
                     {
                         string thisMessage = "Debug Info: stopwatch elapsedMs is " + stopwatch.ElapsedMilliseconds + "ms";
                         if (thisMessage == debugMessage)
@@ -1558,58 +1555,58 @@ namespace AcsListener
                         {
                             if (messageCounter > 0)
                             {
-                                Log.Verbose($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] Debug Info: <previous message repeated {messageCounter} times");
+                                Log.Verbose($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}] Debug Info: <previous message repeated {messageCounter} times");
                             }
                             messageCounter = 0;
-                            Log.Verbose($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {thisMessage}");
+                            Log.Verbose($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}] {thisMessage}");
                             debugMessage = thisMessage;
                         }
                     }
 
-                    if (stream.DataAvailable == true)
+                    if (ListenerStream.DataAvailable == true)
                     {
-                        numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
-                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
+                        numberOfBytes = ListenerStream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader responseHeader = new AcspResponseHeader(header);
                         if (responseHeader.Key.IsBadRequest)
                         {
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: GetStatusResponse [Bad Message] received from ACS!");
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: GetStatusResponse [Bad Message] received from ACS!");
                             // Need some control logic here to figure out how to handle a Bad Request message
                         }
 
                         if (responseHeader.Key.IsGoodRequest)
                         {
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good GetStatusResponse received from ACS!");
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Good GetStatusResponse received from ACS!");
 
                             if (responseHeader.Key.NodeNames == Byte13NodeNames.GetStatusResponse)
                             {
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Expected GetStatusResponse has been received");
+                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Expected GetStatusResponse has been received");
 
                                 int length = responseHeader.PackLength.Length;
 
                                 Byte[] bytes = new Byte[length];
-                                numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte GetStatusResponse successfully read from network stream");
+                                numberOfBytes = ListenerStream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
+                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {numberOfBytes}-byte GetStatusResponse successfully read from network stream");
 
                                 AcspGetStatusResponse statusResponse = new AcspGetStatusResponse(bytes);
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {statusResponse.RequestId}");
+                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: RequestId is: {statusResponse.RequestId}");
 
                                 if (statusResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful)
                                 {
-                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: RrpSuccessful");
-                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Message Received: {statusResponse.StatusResponseMessage}");
+                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Response Received: RrpSuccessful");
+                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Message Received: {statusResponse.StatusResponseMessage}");
                                 }
                                 else
                                 {
-                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {statusResponse.StatusResponseKeyString}");
+                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Response Received: {statusResponse.StatusResponseKeyString}");
                                 }
 
                                 messagePairSuccessful = true;
                                 outputMessage = statusResponse.StatusResponseKeyString;
                             }
                         }
-                    }  // if (stream.DataAvailable == true)
+                    }  // if (ListenerStream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
 
@@ -1627,7 +1624,7 @@ namespace AcsListener
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
 
-            if (debugOutput is true)
+            if (DebugOutput is true)
             {
                 Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
@@ -1640,19 +1637,19 @@ namespace AcsListener
             while (messagePairSuccessful == false)
             {
                 // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-                if (stream.DataAvailable is true)
+                if (ListenerStream.DataAvailable is true)
                 {
-                    int clearedBytes = stream.ClearStreamForNextMessage();
-                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                    int clearedBytes = ListenerStream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
                 }
 
                 // Prepare the SetRplLocationRequest data packet
                 AcspSetRplLocationRequest rplRequest = new AcspSetRplLocationRequest(resourceUrl, playoutId);
-                currentRequestId = rplRequest.RequestId;
+                CurrentRequestId = rplRequest.RequestId;
 
                 // Send the SetRplLocationRequest data packet to the ACS
-                stream.Write(rplRequest.PackArray, 0, rplRequest.PackArray.Length);
-                Log.Information($"[{DateTime.Now}]SetRplLocation Request sent to ACS.  RequestID #: {currentRequestId}");
+                ListenerStream.Write(rplRequest.PackArray, 0, rplRequest.PackArray.Length);
+                Log.Information($"[{DateTime.Now}]SetRplLocation Request sent to ACS.  RequestID #: {CurrentRequestId}");
 
                 // Wait for SetRplLocationResponse from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
@@ -1662,48 +1659,48 @@ namespace AcsListener
                 // Expecting a GetStatusResponse message
                 while (messagePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValue))
                 {
-                    if (stream.DataAvailable == true)
+                    if (ListenerStream.DataAvailable == true)
                     {
-                        numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
-                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
+                        numberOfBytes = ListenerStream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader responseHeader = new AcspResponseHeader(header);
                         if (responseHeader.Key.IsBadRequest)
                         {
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: SetRplLocation [Bad Message] received from ACS!");
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: SetRplLocation [Bad Message] received from ACS!");
                             // Need some control logic here to figure out how to handle a Bad Request message
                         }
 
                         if (responseHeader.Key.IsGoodRequest)
                         {
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good SetRplLocationResponse received from ACS!");
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Good SetRplLocationResponse received from ACS!");
 
                             if (responseHeader.Key.NodeNames == Byte13NodeNames.SetRplLocationResponse)
                             {
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Expected SetRplLocationResponse has been received");
+                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Expected SetRplLocationResponse has been received");
 
                                 int length = responseHeader.PackLength.Length;
 
                                 Byte[] bytes = new Byte[length];
-                                numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                                Log.Information( $"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte SetRplLocationResponse successfully read from network stream");
+                                numberOfBytes = ListenerStream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
+                                Log.Information( $"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {numberOfBytes}-byte SetRplLocationResponse successfully read from network stream");
 
                                 AcspSetRplLocationResponse locationResponse = new AcspSetRplLocationResponse(bytes);
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {locationResponse.RequestId}");
+                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: RequestId is: {locationResponse.RequestId}");
 
                                 if ((locationResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful) || (locationResponse.StatusResponseKey == GeneralStatusResponseKey.Processing))
                                 {
                                     messagePairSuccessful = true;
-                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {locationResponse.StatusResponseKeyString}");
-                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Message Received: {locationResponse.StatusResponseMessage}");
+                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Response Received: {locationResponse.StatusResponseKeyString}");
+                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Message Received: {locationResponse.StatusResponseMessage}");
                                 }
                                 else
                                 {
-                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {locationResponse.StatusResponseKeyString}");
+                                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Response Received: {locationResponse.StatusResponseKeyString}");
                                 }
                             }
                         }
-                    }  // if (stream.DataAvailable == true)
+                    }  // if (ListenerStream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
 
@@ -1720,7 +1717,7 @@ namespace AcsListener
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
 
-            if (debugOutput is true)
+            if (DebugOutput is true)
             {
                 Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
@@ -1733,19 +1730,19 @@ namespace AcsListener
             while (messagePairSuccessful == false)
             {
                 // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-                if (stream.DataAvailable is true)
+                if (ListenerStream.DataAvailable is true)
                 {
-                    int clearedBytes = stream.ClearStreamForNextMessage();
-                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                    int clearedBytes = ListenerStream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
                 }
 
                 // Prepare the SetOutputModeRequest data packet
                 AcspSetOutputModeRequest outputModeRequest = new AcspSetOutputModeRequest(outputMode);
-                currentRequestId = outputModeRequest.RequestId;
+                CurrentRequestId = outputModeRequest.RequestId;
 
                 // Send the SetOutputModeRequest data packet to the ACS
-                stream.Write(outputModeRequest.PackArray, 0, outputModeRequest.PackArray.Length);
-                Log.Information($"[{DateTime.Now}]SetOutputMode Request sent to ACS.  RequestID #: {currentRequestId}");
+                ListenerStream.Write(outputModeRequest.PackArray, 0, outputModeRequest.PackArray.Length);
+                Log.Information($"[{DateTime.Now}]SetOutputMode Request sent to ACS.  RequestID #: {CurrentRequestId}");
 
                 // Wait for SetOutputMode Response from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
@@ -1755,9 +1752,9 @@ namespace AcsListener
                 // Expecting a GetStatusResponse message
                 while (messagePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValue))
                 {
-                    if (stream.DataAvailable == true)
+                    if (ListenerStream.DataAvailable == true)
                     {
-                        numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
+                        numberOfBytes = ListenerStream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
                         Log.Information($"[Thread #{thread.ManagedThreadId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader responseHeader = new AcspResponseHeader(header);
@@ -1778,7 +1775,7 @@ namespace AcsListener
                                 int length = responseHeader.PackLength.Length;
 
                                 Byte[] bytes = new Byte[length];
-                                numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
+                                numberOfBytes = ListenerStream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
                                 Log.Information($"[Thread #{thread.ManagedThreadId}]: {numberOfBytes}-byte SetRplLocationResponse successfully read from network stream");
 
                                 AcspSetOutputModeResponse outputModeResponse = new AcspSetOutputModeResponse(bytes);
@@ -1796,7 +1793,7 @@ namespace AcsListener
                                 }
                             }
                         }
-                    }  // if (stream.DataAvailable == true)
+                    }  // if (ListenerStream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
 
@@ -1812,7 +1809,7 @@ namespace AcsListener
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
-            if (debugOutput is true)
+            if (DebugOutput is true)
             {
                 Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
@@ -1825,19 +1822,19 @@ namespace AcsListener
             while (messagePairSuccessful == false)
             {
                 // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-                if (stream.DataAvailable is true)
+                if (ListenerStream.DataAvailable is true)
                 {
-                    int clearedBytes = stream.ClearStreamForNextMessage();
-                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                    int clearedBytes = ListenerStream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
                 }
 
                 // Prepare the UpdateTimelineRequest data packet
                 AcspUpdateTimelineRequest updateTimelineRequest = new AcspUpdateTimelineRequest(testPlayoutId, timelineEditUnits);
-                currentRequestId = updateTimelineRequest.RequestId;
+                CurrentRequestId = updateTimelineRequest.RequestId;
 
                 // Send the UpdateTimelineRequest data packet to the ACS
-                stream.Write(updateTimelineRequest.PackArray, 0, updateTimelineRequest.PackArray.Length);
-                Log.Information($"[{DateTime.Now}]UpdateTimeline Request sent to ACS.  RequestID #: {currentRequestId}");
+                ListenerStream.Write(updateTimelineRequest.PackArray, 0, updateTimelineRequest.PackArray.Length);
+                Log.Information($"[{DateTime.Now}]UpdateTimeline Request sent to ACS.  RequestID #: {CurrentRequestId}");
 
                 // Wait for UpdateTimeline Response from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
@@ -1847,9 +1844,9 @@ namespace AcsListener
                 // Expecting a GetStatusResponse message
                 while (messagePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValue))
                 {
-                    if (stream.DataAvailable == true)
+                    if (ListenerStream.DataAvailable == true)
                     {
-                        numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
+                        numberOfBytes = ListenerStream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
                         Log.Information($"[Thread #{thread.ManagedThreadId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader responseHeader = new AcspResponseHeader(header);
@@ -1870,7 +1867,7 @@ namespace AcsListener
                                 int length = responseHeader.PackLength.Length;
 
                                 Byte[] bytes = new Byte[length];
-                                numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
+                                numberOfBytes = ListenerStream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
                                 Log.Information($"[Thread #{thread.ManagedThreadId}]: {numberOfBytes}-byte UpdateTimelineResponse successfully read from network stream");
 
                                 AcspUpdateTimelineResponse updateTimelineResponse = new AcspUpdateTimelineResponse(bytes);
@@ -1888,7 +1885,7 @@ namespace AcsListener
                                 }
                             }
                         }
-                    }  // if (stream.DataAvailable == true)
+                    }  // if (ListenerStream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
 
@@ -1906,7 +1903,7 @@ namespace AcsListener
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
 
-            if (debugOutput is true)
+            if (DebugOutput is true)
             {
                 Log.Verbose($"[Thread #{thread.ManagedThreadId}]: Waiting on signal to allow write to stream");
             }
@@ -1919,19 +1916,19 @@ namespace AcsListener
             while (messagePairSuccessful == false)
             {
                 // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-                if (stream.DataAvailable is true)
+                if (ListenerStream.DataAvailable is true)
                 {
-                    int clearedBytes = stream.ClearStreamForNextMessage();
-                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+                    int clearedBytes = ListenerStream.ClearStreamForNextMessage();
+                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
                 }
 
                 // Prepare the TerminateLeaseRequest data packet
                 AcspTerminateLeaseRequest terminateLeaseRequest = new AcspTerminateLeaseRequest();
-                currentRequestId = terminateLeaseRequest.RequestId;
+                CurrentRequestId = terminateLeaseRequest.RequestId;
 
                 // Send the TerminateLeaseRequest data packet to the ACS
-                stream.Write(terminateLeaseRequest.PackArray, 0, terminateLeaseRequest.PackArray.Length);
-                Log.Information($"[{DateTime.Now}]TerminateLease Request sent to ACS.  RequestID #: {currentRequestId}");
+                ListenerStream.Write(terminateLeaseRequest.PackArray, 0, terminateLeaseRequest.PackArray.Length);
+                Log.Information($"[{DateTime.Now}]TerminateLease Request sent to ACS.  RequestID #: {CurrentRequestId}");
 
                 // Wait for TerminateLease Response from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
 
@@ -1941,9 +1938,9 @@ namespace AcsListener
                 // Expecting a TerminateLeaseResponse message
                 while (messagePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValue))
                 {
-                    if (stream.DataAvailable == true)
+                    if (ListenerStream.DataAvailable == true)
                     {
-                        numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
+                        numberOfBytes = ListenerStream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
                         Log.Information($"[Thread #{thread.ManagedThreadId}] {numberOfBytes}-byte header successfully read from network stream");
 
                         AcspResponseHeader responseHeader = new AcspResponseHeader(header);
@@ -1964,7 +1961,7 @@ namespace AcsListener
                                 int length = responseHeader.PackLength.Length;
 
                                 Byte[] bytes = new Byte[length];
-                                numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
+                                numberOfBytes = ListenerStream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
                                 Log.Information($"[Thread #{thread.ManagedThreadId}]: {numberOfBytes}-byte TerminateLeaseResponse successfully read from network stream");
 
                                 AcspTerminateLeaseResponse terminateLeaseResponse = new AcspTerminateLeaseResponse(bytes);
@@ -1982,7 +1979,7 @@ namespace AcsListener
                                 }
                             }
                         }
-                    }  // if (stream.DataAvailable == true)
+                    }  // if (ListenerStream.DataAvailable == true)
                 }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
             } // end while(messagePairSuccessful == false)
 
