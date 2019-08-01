@@ -1003,74 +1003,72 @@ namespace AcsListener
         {
             const int timeoutValue = 2000;
             uint leaseSeconds = 60;
-            // int numberOfBytes = 0;
-            // UInt32 testPlayoutId = 49520318;
-            // UInt64 timelineStart = 0;
-            // UInt64 timelineEditUnits = 14400;  // 24 (edit units per second) * 60 (seconds) * 10 (minutes)
-            // UInt64 timelineEditUnits = 16000;  // 25 (edit units per second) * 60 (seconds) * 10 (minutes) = 15000, and adding another 1000 to make timecode 10:40
-            // string testResourceUrl = "http://192.168.9.88/CaptiView/rpl_test1.xml";
 
             var myParams = (ListenerProcessParams)listenerProcessParamsObject;
+            TcpClient tempTcpClient = myParams.Client;
 
-            if ((ListenerClient != null) && (ListenerClient.Connected))
-            {
-                // If the static ListenerClient is already connected in another thread then we need to do the following:
-                //    1) Check the signal to make sure that no other thread is trying to write to the stream right now
-                //    2) Lock the signal so that no other thread tries to write
-                //    3) Close the existing stream
-                //    4) Close the existing TCP connection
-
-
-                if (stream != null)
-                {
-                    try
-                    {
-                        CanWriteToStream.WaitOne();   // Wait to make sure no one else is trying to write to the NetworkStream
-                        CanWriteToStream.Reset();     // Disable writing to the ACS NetworkStream for any other thread
-                        stream.Close();               // Close and dispose of the ACS NetworkStream
-                    }
-                    finally
-                    {
-                        stream = null;                // Null out the static ACS NetworkStream
-                    }
-                }
-
-                ListenerClient.Close();           // Close the existing TCP connection
-            }
-
-            ListenerClient = myParams.Client;
-            KillCommandReceived = false;          // Initialize the control logic, only set to true by DoCommandKill()
+            NetworkStream tempStream = tempTcpClient.GetStream();
+            tempStream.WriteTimeout = timeoutValue; // sets the timeout to X milliseconds
+            tempStream.ReadTimeout = timeoutValue; // sets the  timeout to X milliseconds
 
             Thread thread = Thread.CurrentThread;
 
             try
             {
-                IPEndPoint remoteEnd = (IPEndPoint) ListenerClient.Client.RemoteEndPoint;
+                IPEndPoint remoteEnd = (IPEndPoint) tempTcpClient.Client.RemoteEndPoint;
                 IPAddress remoteAddress = remoteEnd.Address;
 
                 Log.Information($"[Thread #: {thread.ManagedThreadId}] Connection Established! RemoteIP: {remoteAddress}");
-                ConnectedToAcs = true; // set the static variable to true to let CommandProcess know if connection has occurred
 
-                // Presumably the ACS has established 
-
-                if (stream != null)
-                {
-                    // Check to see if stream hasn't been cleaned up properly since the last connection
-                    // If it hasn't, then we need to clean that up first
-
-                    stream.Close();
-                }
-
-                stream = ListenerClient.GetStream();
-                stream.WriteTimeout = timeoutValue; // sets the timeout to X milliseconds
-                stream.ReadTimeout = timeoutValue; // sets the  timeout to X milliseconds
-
-                CanWriteToStream.Set(); // Finally, set the signal to indicate that the NetworkStream can be written to by other threads
+                // Presumably the ACS has established, but we need to make sure that it IS an ACS device that is connecting on 4170
 
                 Thread.Sleep(2000); // Brief pause to give any other cleanup activity the chance to finish
 
-                // Announce to ACS and get response, set lease with ACS, and finally get status from ACS.  All other actions handled by command process
-                ProcessAnnounceRrp();
+                CanWriteToStream.Set(); // Finally, set the signal to indicate that the NetworkStream can be written to by other threads
+
+                // Announce to ACS to prove that this IS an ACS device that is talking to us, throw AcspAnnounceException if not
+                ProcessAnnounceRrp(tempStream);
+
+                // If we made it this far, then presumably we ARE connected to an ACS device
+
+                if ((ListenerClient != null) && (ListenerClient.Connected))
+                {
+                    // If the static ListenerClient is already connected in another thread then we need to do the following:
+                    //    1) Check the signal to make sure that no other thread is trying to write to the stream right now
+                    //    2) Lock the signal so that no other thread tries to write
+                    //    3) Close the existing stream
+                    //    4) Close the existing TCP connection
+
+
+                    if (stream != null)
+                    {
+                        try
+                        {
+                            CanWriteToStream.WaitOne(); // Wait to make sure no one else is trying to write to the NetworkStream
+                            CanWriteToStream.Reset(); // Disable writing to the ACS NetworkStream for any other thread
+
+                            // Close and dispose of the ACS NetworkStream
+                            stream?.Close(); 
+                            stream?.Dispose();
+                        }
+                        finally
+                        {
+                            stream = null; // Null out the static ACS NetworkStream
+                        }
+                    }
+
+                    ListenerClient?.Close(); // Close the existing TCP connection
+                    ListenerClient?.Dispose();  
+                }
+
+                // Since we have proven it is an ACS talking to us, this will become the new ACS connection
+                ListenerClient = tempTcpClient;  
+                stream = tempStream;
+                ConnectedToAcs = true; // set the static variable to true to let CommandProcess know if connection has occurred
+
+                KillCommandReceived = false; // Initialize the control logic, only set to true by DoCommandKill()
+
+                // set lease with ACS, and finally get status from ACS.  All other actions handled by command process
                 ProcessGetNewLeaseRrp(leaseSeconds);
                 ProcessGetStatusRrp();
 
@@ -1103,35 +1101,37 @@ namespace AcsListener
             }
             catch (IOException ex)
             {
-                Log.Error($"Error: Socket timeout of {timeoutValue} reached");
-                Log.Error($"Exception message: {ex.Message}");
+                Log.Error($"[Thread #{thread.ManagedThreadId}] Error: Socket timeout of {timeoutValue} reached");
+                Log.Error($"[Thread #{thread.ManagedThreadId}] Exception message: {ex.Message}");
+                DoAcsConnectionCleanup();
             }
             catch (ArgumentOutOfRangeException ex)
             {
-                Log.Error($"Error: An ArgumentException has occurred: {ex.Message}");
+                Log.Error($"[Thread #{thread.ManagedThreadId}] Error: An ArgumentException has occurred: {ex.Message}");
+                DoAcsConnectionCleanup();
             }
             catch (ObjectDisposedException ex) // likely to occur when the NetworkStream object "stream" has been cleaned up but another thread is trying to access
             {
-                Log.Error($"Error: An ObjectDisposedException has occurred: {ex.Message}");
+                Log.Error($"[Thread #{thread.ManagedThreadId}] Error: An ObjectDisposedException has occurred: {ex.Message}");
+                DoAcsConnectionCleanup();
             }
             catch (NullReferenceException ex) // likely to occur when TcpClient "ListenerClient" has been disposed and nulled out, but another thread is trying to access
             {
-                Log.Error($"Error: A NullReferenceException has occurred: {ex.Message}");
+                Log.Error($"[Thread #{thread.ManagedThreadId}] Error: A NullReferenceException has occurred: {ex.Message}");
+                DoAcsConnectionCleanup();
+            }
+            catch (AcspAnnounceException ex)
+            { 
+                // Log the error, but we do not want to abort any pre-existing ACS connection
+                Log.Error($"[Thread #{thread.ManagedThreadId}] Error: {ex.Message}");
+
+                CanWriteToStream.Set();  // Open up the signal so that processes can write to the ACS again
+                tempTcpClient?.Dispose();  // Since we're not assigning anything from the tempTcpClient, get rid of it
+                tempStream?.Dispose();
             }
             finally
             {
-                DoAcsConnectionCleanup();
-
-                // Prepare to clear out the rplLoadInfo static data, but before we do, if there are any RPLs loaded, we will save that off for possible RELOAD
-                if (rplLoadInfo != null)
-                {
-                    if (rplLoadInfo.LoadCount > 0)
-                    {
-                        rplReloadInfo = rplLoadInfo;
-                        Log.Information($"[Thread #: {thread.ManagedThreadId}] Storing [{rplLoadInfo.LoadCount}] existing RPL information for RELOAD command use.");
-                    }
-                }
-                rplLoadInfo = new RplLoadInformation();   // effectively clear out the static RPL information
+                Log.Information($"[Thread #{thread.ManagedThreadId}: End of ListenerProcess");
             }
 
         }
@@ -1191,6 +1191,17 @@ namespace AcsListener
                     ListenerClient = null;
                 }
             }
+
+            // Prepare to clear out the rplLoadInfo static data, but before we do, if there are any RPLs loaded, we will save that off for possible RELOAD
+            if (rplLoadInfo != null)
+            {
+                if (rplLoadInfo.LoadCount > 0)
+                {
+                    rplReloadInfo = rplLoadInfo;
+                    Log.Information($"[Thread #: {thread.ManagedThreadId}] Storing [{rplLoadInfo.LoadCount}] existing RPL information for RELOAD command use.");
+                }
+            }
+            rplLoadInfo = new RplLoadInformation();   // effectively clear out the static RPL information
 
             ConnectedToAcs = false;   // Set the flag to indicate that connection to/from the ACS has been terminated
         }
@@ -1303,11 +1314,10 @@ namespace AcsListener
         }
 
         /// <summary>Processes the Announce RRP (Request and Response Pair)</summary>
-        private static void ProcessAnnounceRrp()
+        private static void ProcessAnnounceRrp(NetworkStream inputStream)
         {
             Thread thread = Thread.CurrentThread;
-            const int timeoutValue = 10000;
-            int numberOfBytes;
+            const int timeoutValueMs = 5000;  // Timeout of 5000ms
 
             Byte[] header = new Byte[20];  // 20 bytes - 16 for the PackKey, and 4 for the BER Length field
 
@@ -1321,71 +1331,79 @@ namespace AcsListener
 
             // Send the "Announce request" to the ACS system, and keep trying until a successful response is received
             bool announcePairSuccessful = false;
-            while (announcePairSuccessful == false)
+
+            // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
+            if (inputStream.DataAvailable is true)
             {
-                // Check to see if there is any unexpected data in the stream, and if so, purge it prior to sending the request
-                if (stream.DataAvailable is true)
+                int clearedBytes = inputStream.ClearStreamForNextMessage();
+                Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
+            }
+
+            // Prepare a new AnnounceRequest data packet
+            AcspAnnounceRequest announceRequest = new AcspAnnounceRequest();
+            currentRequestId = announceRequest.RequestId;
+
+            // Send the AnnounceRequest data packet to the ACS
+            inputStream.Write(announceRequest.PackArray, 0, announceRequest.PackArray.Length);
+            Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]Announce Request sent to ACS.  RequestID #: {currentRequestId}");
+
+            // Wait for AnnounceResponse from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
+
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+
+            // Expecting an AnnounceResponse message
+            while (announcePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValueMs))
+            {
+                if (inputStream.DataAvailable == true)
                 {
-                    int clearedBytes = stream.ClearStreamForNextMessage();
-                    Log.Debug($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {clearedBytes} bytes of additional data cleared from the stream");
-                }
+                    var numberOfBytes = inputStream.Read(header, 0, header.Length);
+                    Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
 
-                // Prepare a new AnnounceRequest data packet
-                AcspAnnounceRequest announceRequest = new AcspAnnounceRequest();
-                currentRequestId = announceRequest.RequestId;
-
-                // Send the AnnounceRequest data packet to the ACS
-                stream.Write(announceRequest.PackArray, 0, announceRequest.PackArray.Length);
-                Log.Information($"[Thread #{thread.ManagedThreadId}, {DateTime.Now}]Announce Request sent to ACS.  RequestID #: {currentRequestId}");
-
-                // Wait for AnnounceResponse from ACS (Per SMPTE 430-10:2010, must wait at least 2 seconds before allowing timeout)
-
-                Stopwatch stopwatch = new Stopwatch();
-                stopwatch.Start();
-
-                // Expecting an AnnounceResponse message
-                while (announcePairSuccessful == false && (stopwatch.ElapsedMilliseconds < timeoutValue))
-                {
-                    if (stream.DataAvailable == true)
+                    AcspResponseHeader announceResponseHeader = new AcspResponseHeader(header);
+                    if (announceResponseHeader.Key.IsBadRequest)
                     {
-                        numberOfBytes = stream.Read(header, 0, header.Length);  // Read 20-byte header in from the NetworkStream
-                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}] {numberOfBytes}-byte header successfully read from network stream");
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: AnnounceResponse [Bad Message] received from ACS!");
+                        // Need some control logic here to figure out how to handle a Bad Request message
+                    }
 
-                        AcspResponseHeader announceResponseHeader = new AcspResponseHeader(header);
-                        if (announceResponseHeader.Key.IsBadRequest)
+                    if (announceResponseHeader.Key.IsGoodRequest)
+                    {
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good AnnounceResponse received from ACS!");
+                        int length = announceResponseHeader.PackLength.Length;
+
+                        Byte[] bytes = new Byte[length];
+                        numberOfBytes = inputStream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte AnnounceResponse successfully read from network stream");
+
+                        AcspAnnounceResponse announceResponse = new AcspAnnounceResponse(bytes);
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {announceResponse.RequestId}");
+                        Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: DeviceDescription is: {announceResponse.DeviceDescription}");
+
+                        // Check for RrpSuccesful code and matching RequestId values
+                        if ((announceResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful) && (currentRequestId == announceResponse.RequestId))
                         {
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: AnnounceResponse [Bad Message] received from ACS!");
-                            // Need some control logic here to figure out how to handle a Bad Request message
+                            announcePairSuccessful = true;
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: RrpSuccessful");
                         }
-
-                        if (announceResponseHeader.Key.IsGoodRequest)
+                        else
                         {
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Good AnnounceResponse received from ACS!");
-                            int length = announceResponseHeader.PackLength.Length;
-
-                            Byte[] bytes = new Byte[length];
-                            numberOfBytes = stream.Read(bytes, 0, bytes.Length); // Read variable-length header in from NetworkStream
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: {numberOfBytes}-byte AnnounceResponse successfully read from network stream");
-
-                            AcspAnnounceResponse announceResponse = new AcspAnnounceResponse(bytes);
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: RequestId is: {announceResponse.RequestId}");
-                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: DeviceDescription is: {announceResponse.DeviceDescription}");
-
-                            if (announceResponse.StatusResponseKey == GeneralStatusResponseKey.RrpSuccessful)
-                            {
-                                announcePairSuccessful = true;
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: RrpSuccessful");
-                            }
-                            else
-                            {
-                                Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {announceResponse.StatusResponseKeyString}");
-                            }
+                            Log.Information($"[Thread #{thread.ManagedThreadId}, RequestID #{currentRequestId}]: Response Received: {announceResponse.StatusResponseKeyString}");
                         }
-                    }  // if (stream.DataAvailable == true)
-                }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
-            }  // end while(annnouncePairSuccessful == false) loop
+                    }
+                } // end if (stream.DataAvailable == true) 
+                else
+                {
+                    Thread.Sleep(100);  // Since there was no data yet, wait 100ms and try again
+                } 
+            }  // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
 
-            CanWriteToStream.Set();  // Signal all other processes that they can write to the stream now
+            CanWriteToStream.Set();  // Open up the signal so that other processes can write to the ACS again
+
+            if (announcePairSuccessful == false) // that means we didn't get a successful message pairing before the time limit ran out
+            {
+                throw new AcspAnnounceException($"Some kind of non-ACS device attempted to connect on the AcsPort");
+            }
         }
 
         private static void ProcessGetNewLeaseRrp(uint leaseSeconds)
