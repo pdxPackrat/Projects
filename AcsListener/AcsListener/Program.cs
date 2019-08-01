@@ -1077,7 +1077,7 @@ namespace AcsListener
                 // As this is a new instance of ACS connection, start up a new instance of the rplLoadInfo static data
                 rplLoadInfo = new RplLoadInformation();
 
-                SetLeaseTimer((leaseSeconds * 1000) / 2);  // Convert to milliseconds and then halve the number
+                SetLeaseTimer((leaseSeconds * 1000) / 2); // Convert to milliseconds and then halve the number
 
                 // Check for TCP connection 
 
@@ -1109,6 +1109,14 @@ namespace AcsListener
             catch (ArgumentOutOfRangeException ex)
             {
                 Log.Error($"Error: An ArgumentException has occurred: {ex.Message}");
+            }
+            catch (ObjectDisposedException ex) // likely to occur when the NetworkStream object "stream" has been cleaned up but another thread is trying to access
+            {
+                Log.Error($"Error: An ObjectDisposedException has occurred: {ex.Message}");
+            }
+            catch (NullReferenceException ex) // likely to occur when TcpClient "ListenerClient" has been disposed and nulled out, but another thread is trying to access
+            {
+                Log.Error($"Error: A NullReferenceException has occurred: {ex.Message}");
             }
             finally
             {
