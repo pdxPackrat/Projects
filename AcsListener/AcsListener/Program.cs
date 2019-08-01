@@ -166,12 +166,12 @@ namespace AcsListener
         /// The method analyzes whether the connecting port is the ACS or the CommandProcess, and based on that port connection, 
         /// it calls either the ListenerProcess (for ACS connections) or the CommandProcess.  
         /// </summary>
-        /// <param name="res">A TcpListener object passed in from MainProcess, either for ACS or CommandProcess port.</param>
-        static private void OnAccept(IAsyncResult res)
+        /// <param name="tcpListenerObject">A TcpListener object passed in from MainProcess, either for ACS or CommandProcess port.</param>
+        static private void OnAccept(IAsyncResult tcpListenerObject)
         {
             // Set up the TcpClient to be used by later methods
-            TcpListener listener = (TcpListener)res.AsyncState;
-            TcpClient client = listener.EndAcceptTcpClient(res);
+            TcpListener listener = (TcpListener)tcpListenerObject.AsyncState;
+            TcpClient client = listener.EndAcceptTcpClient(tcpListenerObject);
 
             // Initialize some of the TCP-related information that is shown in the AcsListener console/logs
             IPEndPoint remoteEnd = (IPEndPoint)client.Client.RemoteEndPoint;
@@ -214,11 +214,11 @@ namespace AcsListener
         /// to the ACS, such as setting OutputMode (true or false), specifying a location of an RPL file for Playout, updating Timeline, etc. 
         /// All of these are handled through a variety of commands that are defined in this method (see comments further in the method for that).  
         /// </summary>
-        /// <param name="obj">An object of type ListenerProcessParams, the main argument contained within is the TcpClient defined in the parent
+        /// <param name="listenerProcessParamsObject">An object of type ListenerProcessParams, the main argument contained within is the TcpClient defined in the parent
         /// process that calls this one.</param>
-        static void CommandProcess(object obj)
+        static void CommandProcess(object listenerProcessParamsObject)
         {
-            var myParams = (ListenerProcessParams)obj;
+            var myParams = (ListenerProcessParams)listenerProcessParamsObject;
             TcpClient CommandClient = myParams.Client;
             Thread thread = Thread.CurrentThread;
 
@@ -227,51 +227,51 @@ namespace AcsListener
                 // Buffer for reading data
                 Byte[] bytes = new byte[512];
                 String data = null;       // the data received from the listener
-                String CommandInput = ""; // the parsed command received
-                bool Listening = true;    // controls the while-loop logic
+                String commandInput = ""; // the parsed command received
+                bool listening = true;    // controls the while-loop logic
 
                 // Enter the listening loop.
-                while (Listening == true)
+                while (listening == true)
                 {
                     // Get a stream object for reading and writing
 
                     NetworkStream commandStream = CommandClient.GetStream();
-                    String CommandGreeting = "COMMAND CONNECTION: WAITING FOR COMMAND INPUT\r\n";
+                    String commandGreeting = "COMMAND CONNECTION: WAITING FOR COMMAND INPUT\r\n";
 
                     // Check the static ConnectedToAcs property to determine whether we have a stable ACS connection or not
                     if (ConnectedToAcs)
                     {
-                        CommandGreeting = CommandGreeting + "( ACS connected ): ";
+                        commandGreeting = commandGreeting + "( ACS connected ): ";
                     }
                     else
                     {
-                        CommandGreeting = CommandGreeting + "( ACS disconnected ): ";
+                        commandGreeting = commandGreeting + "( ACS disconnected ): ";
                     }
 
                     // Send back a response 
-                    byte[] msg = System.Text.Encoding.ASCII.GetBytes(CommandGreeting);
+                    byte[] msg = System.Text.Encoding.ASCII.GetBytes(commandGreeting);
                     commandStream.Write(msg, 0, msg.Length);
 
                     // Prepare for looping
                     data = null;
                     int i;
-                    bool CancelCommandReceived = false;   // used to control the while-loop logic (and when to quit)
+                    bool cancelCommandReceived = false;   // used to control the while-loop logic (and when to quit)
                     
                     // loop to receive all of the data sent by the client
-                    while ((CancelCommandReceived == false) && ((i = commandStream.Read(bytes, 0, bytes.Length)) != 0))
+                    while ((cancelCommandReceived == false) && ((i = commandStream.Read(bytes, 0, bytes.Length)) != 0))
                     {
                         // Translate the data bytes in to an ASCII string
                         data = System.Text.Encoding.ASCII.GetString(bytes, 0, i);
 
                         if (data == "\u0003") // checking for a CTRL+C from the connected terminal
                         {
-                            CancelCommandReceived = true;   // set boolean logic to exit the while-loop
+                            cancelCommandReceived = true;   // set boolean logic to exit the while-loop
                             Log.Information("Received Cancel Command");
                         }
                         else if (data == "\b")
                         {
                             // Need to trim the last character in CommandInput, if it has anything in it
-                            CommandInput = CommandInput.TrimLastCharacter();
+                            commandInput = commandInput.TrimLastCharacter();
                         }
                         else
                         {
@@ -281,10 +281,10 @@ namespace AcsListener
                             if (data == "\r\n")
                             {
                                 // check first if it is one of the CANCEL/QUIT commands
-                                if (CommandInput.ToUpper() == "CANCEL" || CommandInput.ToUpper() == "QUIT" || CommandInput.ToUpper() == "EXIT")
+                                if (commandInput.ToUpper() == "CANCEL" || commandInput.ToUpper() == "QUIT" || commandInput.ToUpper() == "EXIT")
                                 {
                                     Log.Information($"Thread #{thread.ManagedThreadId}: CANCEL/QUIT command received - terminating connection");
-                                    CancelCommandReceived = true;
+                                    cancelCommandReceived = true;
                                 }
                                 else  // Begin the section that parses for one of the main commands
                                 {
@@ -303,37 +303,37 @@ namespace AcsListener
                                     // RELOAD - if any RPL are available for a RELOAD, it will reload all of them
                                     // KILL   - Performs a STOP, and then terminates the lease
 
-                                    var CommandSplit = CommandInput.Split(' ');
-                                    string CommandBase = CommandSplit[0];
-                                    string CommandParameter = ""; 
+                                    var commandSplit = commandInput.Split(' ');
+                                    string commandBase = commandSplit[0];
+                                    string commandParameter = ""; 
                                     String commandOutput = "";  // Any output returned from the processed command
 
-                                    if (CommandSplit.Length >= 2) // at least one parameter was passed in with this command - we only accept the first parameter at the moment
+                                    if (commandSplit.Length >= 2) // at least one parameter was passed in with this command - we only accept the first parameter at the moment
                                     {
-                                        CommandParameter = CommandSplit[1];
+                                        commandParameter = commandSplit[1];
                                     }
 
                                     // Output the command details to the AcsListener console
-                                    Log.Information($"Thread #{thread.ManagedThreadId}:  Command Received:  {CommandBase.ToUpper()} {CommandParameter}");
+                                    Log.Information($"Thread #{thread.ManagedThreadId}:  Command Received:  {commandBase.ToUpper()} {commandParameter}");
 
                                     // Confirm that we are connected to the ACS, and if so start processing input from Command connection
                                     if (ConnectedToAcs is true)
                                     {
                                         // Start processing based on which command was received
-                                        switch (CommandBase.ToUpper())
+                                        switch (commandBase.ToUpper())
                                         {
                                             case "STATUS":
                                                 commandOutput = DoCommandStatus();
                                                 break;
 
                                             case "LOAD":
-                                                if (CommandParameter == "")
+                                                if (commandParameter == "")
                                                 {
                                                     commandOutput = "LOAD command requires a parameter in format of LOAD \"FullyQualifiedUrlPath\"";
                                                 }
                                                 else
                                                 {
-                                                    string UrlPath = CommandParameter;
+                                                    string UrlPath = commandParameter;
                                                     commandOutput = DoCommandLoad(UrlPath);
                                                 }
                                                 break;
@@ -351,7 +351,7 @@ namespace AcsListener
                                                 break;
 
                                             case "TIME":
-                                                if (CommandParameter == "")
+                                                if (commandParameter == "")
                                                 {
                                                     commandOutput = "TIME command requires a parameter in format of TIME <parameter>, where parameter is either HH:MM:SS, MM:SS, or MM";
                                                 }
@@ -364,7 +364,7 @@ namespace AcsListener
 
                                                         if (playoutData.EditRate != "")
                                                         {
-                                                            string timeOffsetInput = CommandParameter;
+                                                            string timeOffsetInput = commandParameter;
                                                             commandOutput = DoCommandTime(timeOffsetInput, playoutData.EditRate); 
                                                         }
                                                         else
@@ -386,7 +386,7 @@ namespace AcsListener
                                             // SELECT command requires single parameter (PlayoutId)
                                             // and performs a DoCommandSelect(), checks for success, and then a DoCommandTime() with 0 timeline.
                                             case "SELECT":
-                                                if (CommandParameter == "")
+                                                if (commandParameter == "")
                                                 {
                                                     commandOutput = "SELECT command requires a parameter in format of SELECT <parameter>, where parameter is the PlayoutId";
                                                 }
@@ -395,7 +395,7 @@ namespace AcsListener
                                                     UInt32 playoutId;
                                                     try
                                                     {
-                                                        playoutId = UInt32.Parse(CommandParameter);
+                                                        playoutId = UInt32.Parse(commandParameter);
 
                                                         if (rplLoadInfo.IsPlayoutSelected is true)
                                                         {
@@ -457,7 +457,7 @@ namespace AcsListener
                                                 }
 
                                                 // Next, confirm that the syntax of the command is correct and break early if not
-                                                if (CommandParameter == "")
+                                                if (commandParameter == "")
                                                 {
                                                     commandOutput = "UNLOAD command requires a parameter in format of UNLOAD <parameter>, where parameter is the PlayoutId";
                                                     break;
@@ -469,7 +469,7 @@ namespace AcsListener
                                                     try
                                                     {
                                                         // Get the Playout ID from the passed parameter
-                                                        playoutId = UInt32.Parse(CommandParameter);
+                                                        playoutId = UInt32.Parse(commandParameter);
 
                                                         // Next check to see if a Playout has been selected
                                                         if (rplLoadInfo.IsPlayoutSelected is true)
@@ -515,12 +515,12 @@ namespace AcsListener
                                                 break;
                                         }
                                     }
-                                    else if ((ConnectedToAcs is false) && (CommandBase.ToUpper() == "STATUS"))
+                                    else if ((ConnectedToAcs is false) && (commandBase.ToUpper() == "STATUS"))
                                     {
                                         // the only functional command allowed when not connected to the ACS is "STATUS" 
                                         commandOutput = DoCommandStatus();
                                     }
-                                    else if ((ConnectedToAcs is false) && (CommandBase.ToUpper() == "HELP"))
+                                    else if ((ConnectedToAcs is false) && (commandBase.ToUpper() == "HELP"))
                                     {
                                         // the only other command allowed is "HELP"
                                         commandOutput = DoCommandHelp();
@@ -528,7 +528,7 @@ namespace AcsListener
                                     else
                                     {
                                         // If we don't meet any of the above criteriaNotify the user that the command is not allowed
-                                        commandOutput = "The " + CommandBase.ToUpper() + " command is not recognized, or is not allowed in this mode";
+                                        commandOutput = "The " + commandBase.ToUpper() + " command is not recognized, or is not allowed in this mode";
                                     }
 
 
@@ -553,19 +553,19 @@ namespace AcsListener
                                     commandOutput = "";
                                 }
 
-                                CommandInput = "";
+                                commandInput = "";
                             }
                             else
                             {
                                 // Concatenate the input to the command string and continue
-                                CommandInput = String.Concat(CommandInput, data);
+                                commandInput = String.Concat(commandInput, data);
                             }
                         }
                     }
 
                     CommandClient.Close();
                     CommandClient.Dispose();
-                    Listening = false;
+                    listening = false;
                 }
 
             }
@@ -998,8 +998,8 @@ namespace AcsListener
         /// ListenerProcess is responsible handling most of the work of the AcsListener.  When a TCP connection is made, 
         /// the main thread spawns off a child thread (via the ThreadPool) to ListenerProcess.  
         /// </summary>
-        /// <param name="obj">A generic object containing data of type ListenerProcessParams</param>
-        static void ListenerProcess(object obj)
+        /// <param name="listenerProcessParamsObject">A generic object containing data of type ListenerProcessParams</param>
+        static void ListenerProcess(object listenerProcessParamsObject)
         {
             const int timeoutValue = 2000;
             uint leaseSeconds = 60;
@@ -1010,7 +1010,7 @@ namespace AcsListener
             // UInt64 timelineEditUnits = 16000;  // 25 (edit units per second) * 60 (seconds) * 10 (minutes) = 15000, and adding another 1000 to make timecode 10:40
             // string testResourceUrl = "http://192.168.9.88/CaptiView/rpl_test1.xml";
 
-            var myParams = (ListenerProcessParams)obj;
+            var myParams = (ListenerProcessParams)listenerProcessParamsObject;
 
             if ((ListenerClient != null) && (ListenerClient.Connected))
             {
@@ -1140,6 +1140,21 @@ namespace AcsListener
         {
             Thread thread = Thread.CurrentThread;
 
+            if (leaseTimer != null)
+            {
+                try
+                {
+                    Log.Information($"[Thread #{thread.ManagedThreadId}] Attempting to stop the Lease Timer ...");
+                    leaseTimer.Stop();
+                    leaseTimer.Dispose();
+                }
+                finally
+                {
+                    leaseTimer = null;
+                    Log.Information($"[Thread #{thread.ManagedThreadId}] Lease Timer has been stopped and closed");
+                }
+            }
+
             if (stream != null)
             {
                 try
@@ -1162,25 +1177,19 @@ namespace AcsListener
                 {
                     try
                     {
-                        Log.Information($"[Thread #{thread.ManagedThreadId}]: closing network connection");
+                        Log.Information($"[Thread #{thread.ManagedThreadId}]: Attempting to close the network connection");
                         ListenerClient.Close();
                     }
                     finally
                     {
                         ListenerClient = null;
+                        Log.Information($"[Thread #{thread.ManagedThreadId}] Successfully closed the network connection");
                     }
                 }
                 else
                 {
                     ListenerClient = null;
                 }
-            }
-
-            if (leaseTimer != null)
-            {
-                leaseTimer.Stop();
-                leaseTimer.Dispose();
-                leaseTimer = null;
             }
 
             ConnectedToAcs = false;   // Set the flag to indicate that connection to/from the ACS has been terminated
