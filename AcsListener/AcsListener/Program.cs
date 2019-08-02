@@ -617,6 +617,8 @@ namespace AcsListener
             return outputMessage;
         }
 
+        /// <summary>Processes the KILL command.  Sets the KillCommandReceived static variable to TRUE. </summary>
+        /// <returns></returns>
         private static string DoCommandKill()
         {
             KillCommandReceived = true;
@@ -624,6 +626,9 @@ namespace AcsListener
             return "KILL command issued to ListenerProcess";
         }
 
+        /// <summary>  Performs the UNLOAD command from the CommandProcessor.   It calls RemoveRplData() method, which removes the supplied PlayoutId from the RplLoadInfo Dictionary.</summary>
+        /// <param name="playoutId">The playout identifier to be removed from the RplLoadInfo Dictionary.</param>
+        /// <returns></returns>
         private static string DoCommandUnload(uint playoutId)
         {
             string outputMessage = "";
@@ -807,6 +812,10 @@ namespace AcsListener
             return outputMessage;
         }
 
+        /// <summary>
+        /// Performs the PLAY command from the CommandProcessor.   Performs some basic validation to make sure that we have an RPL selected for playout, and then calls ProcessSetOutputModeRrp(true)
+        /// </summary>
+        /// <returns></returns>
         private static string DoCommandPlay()
         {
             String outputMessage = "";
@@ -838,6 +847,8 @@ namespace AcsListener
             return outputMessage;
         }
 
+        /// <summary>  Performs the STATUS command from the CommandProcessor.</summary>
+        /// <returns>Whether the ACS is connected, and if so, what the current playout is set to.</returns>
         private static string DoCommandStatus()
         {
             string result;
@@ -1133,6 +1144,10 @@ namespace AcsListener
 
         }
 
+        /// <summary>
+        /// Stops / closes the AcspLeaseTimer object "LeaseTimer", the TcpClient object "ListenerClient", and the NetworkStream object "ListenerStream",
+        /// and then makes sure that any RplLoadInformation object data (if present) is saved to a temporary storage location for later usage by the RELOAD command.
+        /// </summary>
         private static void DoAcsConnectionCleanup()
         {
             Thread thread = Thread.CurrentThread;
@@ -1311,6 +1326,8 @@ namespace AcsListener
         }
 
         /// <summary>Processes the Announce RRP (Request and Response Pair)</summary>
+        /// <param name="inputStream">NetworkStream object to use for communication to/from the ACS device</param>
+        /// <exception cref="AcspAnnounceException">Thrown if the message pairing logic fails to succeed and caught by ListenerProcess</exception>
         private static void ProcessAnnounceRrp(NetworkStream inputStream)
         {
             Thread thread = Thread.CurrentThread;
@@ -1403,6 +1420,8 @@ namespace AcsListener
             }
         }
 
+        /// <summary>  Sends GetNewLease message to the ACS.</summary>
+        /// <param name="leaseSeconds">The lease seconds.</param>
         private static void ProcessGetNewLeaseRrp(uint leaseSeconds)
         {
             Thread thread = Thread.CurrentThread;
@@ -1497,6 +1516,11 @@ namespace AcsListener
         }  // end ProcessGetNewLeaseRrp()
 
 
+        /// <summary>
+        /// Sends the GetStatus message to the ACS device.   This message type is used immediately following a LoadRpl,
+        /// and is also the message type used for the periodic "heartbeat" message that is sent every 30 seconds by default.
+        /// </summary>
+        /// <returns></returns>
         private static string ProcessGetStatusRrp()
         {
             Thread thread = Thread.CurrentThread;
@@ -1615,6 +1639,9 @@ namespace AcsListener
 
         }  // end ProcessGetStatusRrp()
 
+        /// <summary>  Sends the SetRplLocation message to the ACS</summary>
+        /// <param name="resourceUrl">  The URL to the RPL file to be loaded</param>
+        /// <param name="playoutId">  PlayoutId of the RPL file to be loaded</param>
         private static void ProcessSetRplLocationRrp(string resourceUrl, UInt32 playoutId)
         {
             Thread thread = Thread.CurrentThread;
@@ -1708,6 +1735,8 @@ namespace AcsListener
 
         }  // end ProcessSetRplLocationRrp()
 
+        /// <summary>  Sends the SetOutputMode message to the ACS</summary>
+        /// <param name="outputMode">  OutputMode for the ACS to set.   If set to TRUE, then CaptiView device will play captions.  If set to FALSE, it will not play captions.</param>
         private static void ProcessSetOutputModeRrp(bool outputMode)
         {
             Thread thread = Thread.CurrentThread;
@@ -1801,6 +1830,9 @@ namespace AcsListener
 
         }  // end ProcessSetRplLocationRrp()
 
+        /// <summary>  Sends an UpdateTimeline message to the ACS</summary>
+        /// <param name="testPlayoutId">The test playout identifier.</param>
+        /// <param name="timelineEditUnits">The timeline edit units.</param>
         private static void ProcessUpdateTimelineRrp(UInt32 testPlayoutId, UInt64 timelineEditUnits)
         {
             Thread thread = Thread.CurrentThread;
@@ -1894,6 +1926,7 @@ namespace AcsListener
         }   // end ProcessUpdateTimelineRrp()
 
 
+        /// <summary>  Sends a TerminateLease message to the ACS</summary>
         private static void ProcessTerminateLease()
         {
             Thread thread = Thread.CurrentThread;
