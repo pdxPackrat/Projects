@@ -40,6 +40,7 @@ namespace AcsListener
         private static bool KillCommandReceived = false;
         private static NetworkStream ListenerStream;
         private static TcpClient ListenerClient;
+        private static Boolean IsAutoReload;
 
         static UInt32 CurrentRequestId = 0; // Tracks the current RequestID number that has been sent to the ACS
         static bool DebugOutput = false;
@@ -87,6 +88,7 @@ namespace AcsListener
             DefaultAcsPort = myConfig.AcsPort;
             DefaultCommandPort = myConfig.CommandPort;
             DefaultRplUrlPath = myConfig.RplUrlPath;
+            IsAutoReload = myConfig.AutoReload;
 
             DebugOutput = options.DebugOutput;
 
@@ -502,7 +504,7 @@ namespace AcsListener
                                                 break;
 
                                             case "RELOAD":
-                                                commandOutput = DoCommandReload();
+                                                commandOutput = DoCommandReload(true);
                                                 break;
 
                                             case "KILL":
@@ -594,24 +596,29 @@ namespace AcsListener
 
         }
 
-        private static string DoCommandReload()
+        /// <summary>  Processes the necessary stuff to perform a RELOAD operation (whether manual or auto)</summary>
+        /// <param name="manualReloadMode">Whether this is a RELOAD from CommandProcess (manual) or not (auto)</param>
+        /// <returns>String representing the output from the child commands</returns>
+        private static string DoCommandReload(Boolean manualReloadMode)
         {
+            if (IsAutoReload == true && manualReloadMode == true)
+            {
+                return "Warning: Manual use of RELOAD command is not needed when AutoReload is configured";
+            }
+
             string outputMessage = "RELOAD not possible as there are no RPLs to reload";
 
-            if (RplReloadInfo != null)
+            if (RplReloadInfo?.LoadCount > 0)
             {
-                if (RplReloadInfo.LoadCount > 0)
+                outputMessage = "Processing RELOAD command: \r\n";
+                foreach(string urlToReload in RplReloadInfo.GetRplUrlList())
                 {
-                    outputMessage = "Processing RELOAD command: \r\n";
-                    foreach(string urlToReload in RplReloadInfo.GetRplUrlList())
-                    {
-                        outputMessage = outputMessage + DoCommandLoad(urlToReload) + "\r\n";
-                    }
-
-                    // After successful RELOAD, we "ZERO" out the RplReloadInfo  
-                    // so that another RELOAD with the same data is not possible
-                    RplReloadInfo = new RplLoadInformation();
+                    outputMessage = outputMessage + DoCommandLoad(urlToReload) + "\r\n";
                 }
+
+                // After successful RELOAD, we "ZERO" out the RplReloadInfo  
+                // so that another RELOAD with the same data is not possible
+                RplReloadInfo = new RplLoadInformation();
             }
 
             return outputMessage;
@@ -1084,7 +1091,23 @@ namespace AcsListener
                 ProcessGetStatusRrp();
 
                 // As this is a new instance of ACS connection, start up a new instance of the RplLoadInfo static data
-                RplLoadInfo = new RplLoadInformation();
+                if (RplLoadInfo?.LoadCount > 0)
+                {
+                    RplLoadInfo = new RplLoadInformation();
+                }
+
+                // Check to see if IsAutoReload is set to TRUE - if so, perform a RELOAD operation instead of setting a new RplLoadInfo
+
+                if (IsAutoReload == true)
+                {
+                    // Now check to see if there is something to RELOAD
+
+                    int numberOfRplsReloaded = GetSavedRplInfo();
+                    if (numberOfRplsReloaded > 0)
+                    {
+                        Log.Information($"[Thread #: {thread.ManagedThreadId}] AutoReloaded {numberOfRplsReloaded} RPL in the ACS");
+                    }
+                }
 
                 SetLeaseTimer((leaseSeconds * 1000) / 2); // Convert to milliseconds and then halve the number
 
@@ -1142,6 +1165,26 @@ namespace AcsListener
                 Log.Information($"[Thread #{thread.ManagedThreadId}: End of ListenerProcess");
             }
 
+        }
+
+        /// <summary>
+        /// Checks whether any Rpl information has been saved in the static RplReloadInfo object, and if so, returns reference to that object.  If not, then returns a new RplLoadInformation() object.
+        /// </summary>
+        /// <returns> Returns the number of saved Rpl that we attempted to RELOAD</returns>
+        private static int GetSavedRplInfo()
+        {
+            int numberOfRplsToReload = 0;
+            string outputMessage;
+            Thread thread = Thread.CurrentThread;
+
+            if (RplReloadInfo?.LoadCount > 0)
+            {
+                numberOfRplsToReload = RplReloadInfo.LoadCount;
+                outputMessage = DoCommandReload(false);
+                Log.Information($"[Thread #: {thread.ManagedThreadId}] {outputMessage}");
+            }
+
+            return numberOfRplsToReload;
         }
 
         /// <summary>
@@ -1214,6 +1257,7 @@ namespace AcsListener
                 }
             }
             RplLoadInfo = new RplLoadInformation();   // effectively clear out the static RPL information
+            Log.Debug($"[Thread #: {thread.ManagedThreadId}] Cleared out old RPL information");
 
             ConnectedToAcs = false;   // Set the flag to indicate that connection to/from the ACS has been terminated
         }
