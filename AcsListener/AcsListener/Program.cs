@@ -34,6 +34,7 @@ namespace AcsListener
                                                           // www.iana.org/assignments/service-names-port-numbers
         private static string DefaultRplUrlPath = "";
 
+        private static IPAddress SavedLocalAddress;
         private static AcspLeaseTimer LeaseTimer;
         private static ManualResetEvent CanWriteToStream = new ManualResetEvent(false);
         private static bool ConnectedToAcs = false;
@@ -182,6 +183,11 @@ namespace AcsListener
             IPAddress localAddress = localEnd.Address;
             Int32 remoteEndPort = remoteEnd.Port;
             Int32 localEndPort = localEnd.Port;
+
+            if (localEndPort == DefaultAcsPort)  // if this is the ACS connecting then ...
+            {
+                SavedLocalAddress = localAddress;   // Save this address for later use by ValidateSubtitleFromUrlString
+            }
 
             Thread thread = Thread.CurrentThread;
 
@@ -937,11 +943,33 @@ namespace AcsListener
 
             }
 
-            // Set the static data first, that is needed by the other commands
-
             if (xmlData.PlayoutId == 0) // basically checking to make sure we didn't get an invalid load
             {
                 return "Error:  RPL file was not loaded correctly.   PlayoutId is not a valid value";
+            }
+
+            // Here we need to figure out some kind of validation for the Resource file: 
+            // xmlData.ReelResources.ReelResource.ResourceFile.ResourceText
+            // We need to figure out first, does a file exist (in much the same way we validate the RPL file location)
+            // then we need to figure out if it is a VALID file of type/class SubtitleReel
+            // and finally if that loads correctly, then we want to validate that the SubtitleReel.Id field starts with "urn:uuid"
+
+            string resourceFileLocation = xmlData.ReelResources.ReelResource.ResourceFile.ResourceText;
+            if (resourceFileLocation != null)
+            {
+                try
+                {
+                    if (ValidateSubtitleFromUrlString(resourceFileLocation) == false)
+                    {
+                        return "Error: RPL is valid, but the resource file does not exist at the specified location";
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Log.Debug($"Error while attempting to validate the Resource/Caption file ({resourceFileLocation}): {ex.Message}");
+
+                    return String.Format($"Validation error in resource file: {ex.Message}");
+                }
             }
 
             RplPlayoutData playoutData = new RplPlayoutData();
@@ -986,6 +1014,73 @@ namespace AcsListener
 
             return outputMessage;
 
+        }
+
+        /// <summary>
+        /// Attempts to load a subtitle at the location specified in the resource file location.
+        /// </summary>
+        /// <param name="resourceFileLocation">The resource file location.</param>
+        /// <returns></returns>
+        private static Boolean ValidateSubtitleFromUrlString(string resourceFileLocation)
+        {
+            Log.Debug($"Verifying that the Resource/Caption file exists at: {resourceFileLocation}");
+
+            // Check to see if the resource file location starts with an "http:"
+            // If not, then let's assume that the Resource location is specified as a local website that the ACS can handle
+            // and as such, we need to prepend the "http://<ipaddress>/" to the resourceFileLocation
+            if (resourceFileLocation.StartsWith("http:", StringComparison.OrdinalIgnoreCase) == false)
+            {
+                if (resourceFileLocation.StartsWith("/") == false)
+                {
+                    resourceFileLocation = "http://" + SavedLocalAddress.ToString() + "/" + resourceFileLocation;  // Prepend "http://<ipaddress>/" 
+                }
+                else
+                {
+                    resourceFileLocation = "http://" + SavedLocalAddress.ToString() + resourceFileLocation;  //  Prepend "http://<ipaddress>" (no trailing "/")
+                }
+            }
+
+            if (IsUrlValid(resourceFileLocation) == false)
+            {
+                Log.Debug($"The resource file does not exist at specified location: {resourceFileLocation}");
+                return false;  // File does not exist at the specified location
+            }
+
+            Log.Debug($"Attempting to load Resource/Caption file: {resourceFileLocation}");
+
+            // Define the XmlSerializer casting to be of type SubtitleReel
+            XmlSerializer deserializer = new XmlSerializer(typeof(SubtitleReel));
+            SubtitleReel xmlData;
+
+            // Open a new WebClient to get the data from the target URL
+            
+            using (WebClient client = new WebClient())
+            {
+                // Note: for issue #59, had to change this to UTF8 encoding to successfully strip the BOM from the byte stream
+                string data = Encoding.UTF8.GetString(client.DownloadData(resourceFileLocation));
+
+                using (Stream memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(data)))
+                {
+                    // Deserialize the input file
+                    object deserializedData = deserializer.Deserialize(memoryStream);
+
+                    // Cast the deserialized data to the SubtitleReel type
+                    xmlData = (SubtitleReel)deserializedData;
+
+                    memoryStream.Close();
+                }
+            }
+
+            Log.Debug("Validation check has successfully loaded SubtitleReel data");
+
+            if (xmlData.Id.StartsWith("urn:uuid:", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         /// <summary>
