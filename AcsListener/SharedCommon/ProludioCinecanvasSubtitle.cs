@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Xml;
 using System.Xml.Serialization;
 using System.IO;
+using Serilog;
 
 namespace SharedCommon
 {
@@ -39,7 +40,91 @@ namespace SharedCommon
 
         [XmlElement("SubtitleList")]
         public SubtitleList SubtitleList { get; set; }
+
+        /// <summary>
+        /// Prevents a default instance of the <see cref="SubtitleReel"/> class from being created.
+        /// </summary>
+        private SubtitleReel()
+        {
+
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SubtitleReel"/> class.
+        /// </summary>
+        /// <param name="inputFile">The input file.</param>
+        public SubtitleReel(string inputFile)
+        {
+            SubtitleReel xmlData;
+
+            try
+            {
+                // Define the XmlSerializer casting to type SubtitleReel
+                XmlSerializer deserializer = new XmlSerializer(typeof(SubtitleReel));
+
+                // Open the input file for reading
+                TextReader reader = new StreamReader(inputFile);
+
+                // Deserialize the input file
+                object deserializedData = deserializer.Deserialize(reader);
+
+                // Cast the deserialized data to the SubtitleReel type
+                xmlData = (SubtitleReel)deserializedData;
+
+                // Close the input file stream
+                reader.Close();
+            }
+            catch (Exception ex)
+            {
+                Log.Debug($"Error encountered in constructor while attempting to deserialize the SubtitleReel object: {ex.Message}");
+                throw;
+            }
+
+            this.Id = xmlData.Id;
+            this.Language = xmlData.Language;
+            this.EditRate = xmlData.EditRate;
+            this.LoadFont = xmlData.LoadFont;
+            this.StartTime = xmlData.StartTime;
+            this.SubtitleList = xmlData.SubtitleList;
+            this.TimeCodeRate = xmlData.TimeCodeRate;
+        }
+
+        /// <summary>
+        /// Another way to solve the problem for us instead of the constructor method, this one parses an XML file and returns the deserialized SubtitleReel.
+        /// </summary>
+        /// <param name="xml">The XML.</param>
+        /// <returns></returns>
+        public static SubtitleReel ParseFromXml(string xml)
+        {
+            SubtitleReel xmlData;
+
+            try
+            {
+                // Define the XmlSerializer casting to type SubtitleReel
+                XmlSerializer deserializer = new XmlSerializer(typeof(SubtitleReel));
+
+                // Open the input file for reading
+                TextReader reader = new StreamReader(xml);
+
+                // Deserialize the input file
+                object deserializedData = deserializer.Deserialize(reader);
+
+                // Cast the deserialized data to the SubtitleReel type
+                xmlData = (SubtitleReel)deserializedData;
+
+                // Close the input file stream
+                reader.Close();
+            }
+            catch (Exception ex)
+            {
+                Log.Debug($"Error encountered in constructor while attempting to deserialize the SubtitleReel object: {ex.Message}");
+                throw;
+            }
+
+            return xmlData;
+        }
     }
+
     public class SubtitleList
     {
         [XmlElement("Font")]

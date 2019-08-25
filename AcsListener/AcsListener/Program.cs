@@ -34,12 +34,14 @@ namespace AcsListener
                                                           // www.iana.org/assignments/service-names-port-numbers
         private static string DefaultRplUrlPath = "";
 
+        private static IPAddress SavedLocalAddress;
         private static AcspLeaseTimer LeaseTimer;
         private static ManualResetEvent CanWriteToStream = new ManualResetEvent(false);
         private static bool ConnectedToAcs = false;
         private static bool KillCommandReceived = false;
         private static NetworkStream ListenerStream;
         private static TcpClient ListenerClient;
+        private static Boolean IsAutoReload;
 
         static UInt32 CurrentRequestId = 0; // Tracks the current RequestID number that has been sent to the ACS
         static bool DebugOutput = false;
@@ -87,6 +89,7 @@ namespace AcsListener
             DefaultAcsPort = myConfig.AcsPort;
             DefaultCommandPort = myConfig.CommandPort;
             DefaultRplUrlPath = myConfig.RplUrlPath;
+            IsAutoReload = myConfig.AutoReload;
 
             DebugOutput = options.DebugOutput;
 
@@ -180,6 +183,11 @@ namespace AcsListener
             IPAddress localAddress = localEnd.Address;
             Int32 remoteEndPort = remoteEnd.Port;
             Int32 localEndPort = localEnd.Port;
+
+            if (localEndPort == DefaultAcsPort)  // if this is the ACS connecting then ...
+            {
+                SavedLocalAddress = localAddress;   // Save this address for later use by ValidateSubtitleFromUrlString
+            }
 
             Thread thread = Thread.CurrentThread;
 
@@ -502,7 +510,7 @@ namespace AcsListener
                                                 break;
 
                                             case "RELOAD":
-                                                commandOutput = DoCommandReload();
+                                                commandOutput = DoCommandReload(true);
                                                 break;
 
                                             case "KILL":
@@ -594,24 +602,29 @@ namespace AcsListener
 
         }
 
-        private static string DoCommandReload()
+        /// <summary>  Processes the necessary stuff to perform a RELOAD operation (whether manual or auto)</summary>
+        /// <param name="manualReloadMode">Whether this is a RELOAD from CommandProcess (manual) or not (auto)</param>
+        /// <returns>String representing the output from the child commands</returns>
+        private static string DoCommandReload(Boolean manualReloadMode)
         {
+            if (IsAutoReload == true && manualReloadMode == true)
+            {
+                return "Warning: Manual use of RELOAD command is not needed when AutoReload is configured";
+            }
+
             string outputMessage = "RELOAD not possible as there are no RPLs to reload";
 
-            if (RplReloadInfo != null)
+            if (RplReloadInfo?.LoadCount > 0)
             {
-                if (RplReloadInfo.LoadCount > 0)
+                outputMessage = "Processing RELOAD command: \r\n";
+                foreach(string urlToReload in RplReloadInfo.GetRplUrlList())
                 {
-                    outputMessage = "Processing RELOAD command: \r\n";
-                    foreach(string urlToReload in RplReloadInfo.GetRplUrlList())
-                    {
-                        outputMessage = outputMessage + DoCommandLoad(urlToReload) + "\r\n";
-                    }
-
-                    // After successful RELOAD, we "ZERO" out the RplReloadInfo  
-                    // so that another RELOAD with the same data is not possible
-                    RplReloadInfo = new RplLoadInformation();
+                    outputMessage = outputMessage + DoCommandLoad(urlToReload) + "\r\n";
                 }
+
+                // After successful RELOAD, we "ZERO" out the RplReloadInfo  
+                // so that another RELOAD with the same data is not possible
+                RplReloadInfo = new RplLoadInformation();
             }
 
             return outputMessage;
@@ -930,11 +943,33 @@ namespace AcsListener
 
             }
 
-            // Set the static data first, that is needed by the other commands
-
             if (xmlData.PlayoutId == 0) // basically checking to make sure we didn't get an invalid load
             {
                 return "Error:  RPL file was not loaded correctly.   PlayoutId is not a valid value";
+            }
+
+            // Here we need to figure out some kind of validation for the Resource file: 
+            // xmlData.ReelResources.ReelResource.ResourceFile.ResourceText
+            // We need to figure out first, does a file exist (in much the same way we validate the RPL file location)
+            // then we need to figure out if it is a VALID file of type/class SubtitleReel
+            // and finally if that loads correctly, then we want to validate that the SubtitleReel.Id field starts with "urn:uuid"
+
+            string resourceFileLocation = xmlData.ReelResources.ReelResource.ResourceFile.ResourceText;
+            if (resourceFileLocation != null)
+            {
+                try
+                {
+                    if (ValidateSubtitleFromUrlString(resourceFileLocation) == false)
+                    {
+                        return "Error: RPL is valid, but the resource file does not exist at the specified location";
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Log.Debug($"Error while attempting to validate the Resource/Caption file ({resourceFileLocation}): {ex.Message}");
+
+                    return String.Format($"Validation error in resource file: {ex.Message}");
+                }
             }
 
             RplPlayoutData playoutData = new RplPlayoutData();
@@ -979,6 +1014,73 @@ namespace AcsListener
 
             return outputMessage;
 
+        }
+
+        /// <summary>
+        /// Attempts to load a subtitle at the location specified in the resource file location.
+        /// </summary>
+        /// <param name="resourceFileLocation">The resource file location.</param>
+        /// <returns></returns>
+        private static Boolean ValidateSubtitleFromUrlString(string resourceFileLocation)
+        {
+            Log.Debug($"Verifying that the Resource/Caption file exists at: {resourceFileLocation}");
+
+            // Check to see if the resource file location starts with an "http:"
+            // If not, then let's assume that the Resource location is specified as a local website that the ACS can handle
+            // and as such, we need to prepend the "http://<ipaddress>/" to the resourceFileLocation
+            if (resourceFileLocation.StartsWith("http:", StringComparison.OrdinalIgnoreCase) == false)
+            {
+                if (resourceFileLocation.StartsWith("/") == false)
+                {
+                    resourceFileLocation = "http://" + SavedLocalAddress.ToString() + "/" + resourceFileLocation;  // Prepend "http://<ipaddress>/" 
+                }
+                else
+                {
+                    resourceFileLocation = "http://" + SavedLocalAddress.ToString() + resourceFileLocation;  //  Prepend "http://<ipaddress>" (no trailing "/")
+                }
+            }
+
+            if (IsUrlValid(resourceFileLocation) == false)
+            {
+                Log.Debug($"The resource file does not exist at specified location: {resourceFileLocation}");
+                return false;  // File does not exist at the specified location
+            }
+
+            Log.Debug($"Attempting to load Resource/Caption file: {resourceFileLocation}");
+
+            // Define the XmlSerializer casting to be of type SubtitleReel
+            XmlSerializer deserializer = new XmlSerializer(typeof(SubtitleReel));
+            SubtitleReel xmlData;
+
+            // Open a new WebClient to get the data from the target URL
+            
+            using (WebClient client = new WebClient())
+            {
+                // Note: for issue #59, had to change this to UTF8 encoding to successfully strip the BOM from the byte stream
+                string data = Encoding.UTF8.GetString(client.DownloadData(resourceFileLocation));
+
+                using (Stream memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(data)))
+                {
+                    // Deserialize the input file
+                    object deserializedData = deserializer.Deserialize(memoryStream);
+
+                    // Cast the deserialized data to the SubtitleReel type
+                    xmlData = (SubtitleReel)deserializedData;
+
+                    memoryStream.Close();
+                }
+            }
+
+            Log.Debug("Validation check has successfully loaded SubtitleReel data");
+
+            if (xmlData.Id.StartsWith("urn:uuid:", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         /// <summary>
@@ -1084,7 +1186,23 @@ namespace AcsListener
                 ProcessGetStatusRrp();
 
                 // As this is a new instance of ACS connection, start up a new instance of the RplLoadInfo static data
-                RplLoadInfo = new RplLoadInformation();
+                if (RplLoadInfo?.LoadCount > 0)
+                {
+                    RplLoadInfo = new RplLoadInformation();
+                }
+
+                // Check to see if IsAutoReload is set to TRUE - if so, perform a RELOAD operation instead of setting a new RplLoadInfo
+
+                if (IsAutoReload == true)
+                {
+                    // Now check to see if there is something to RELOAD
+
+                    int numberOfRplsReloaded = GetSavedRplInfo();
+                    if (numberOfRplsReloaded > 0)
+                    {
+                        Log.Information($"[Thread #: {thread.ManagedThreadId}] AutoReloaded {numberOfRplsReloaded} RPL in the ACS");
+                    }
+                }
 
                 SetLeaseTimer((leaseSeconds * 1000) / 2); // Convert to milliseconds and then halve the number
 
@@ -1142,6 +1260,26 @@ namespace AcsListener
                 Log.Information($"[Thread #{thread.ManagedThreadId}: End of ListenerProcess");
             }
 
+        }
+
+        /// <summary>
+        /// Checks whether any Rpl information has been saved in the static RplReloadInfo object, and if so, returns reference to that object.  If not, then returns a new RplLoadInformation() object.
+        /// </summary>
+        /// <returns> Returns the number of saved Rpl that we attempted to RELOAD</returns>
+        private static int GetSavedRplInfo()
+        {
+            int numberOfRplsToReload = 0;
+            string outputMessage;
+            Thread thread = Thread.CurrentThread;
+
+            if (RplReloadInfo?.LoadCount > 0)
+            {
+                numberOfRplsToReload = RplReloadInfo.LoadCount;
+                outputMessage = DoCommandReload(false);
+                Log.Information($"[Thread #: {thread.ManagedThreadId}] {outputMessage}");
+            }
+
+            return numberOfRplsToReload;
         }
 
         /// <summary>
@@ -1214,6 +1352,7 @@ namespace AcsListener
                 }
             }
             RplLoadInfo = new RplLoadInformation();   // effectively clear out the static RPL information
+            Log.Debug($"[Thread #: {thread.ManagedThreadId}] Cleared out old RPL information");
 
             ConnectedToAcs = false;   // Set the flag to indicate that connection to/from the ACS has been terminated
         }

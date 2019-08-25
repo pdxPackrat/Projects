@@ -48,7 +48,6 @@ namespace RplCreator
 
         private static void MainProcessing(Options options)
         {
-
             string fileBasename = Path.GetFileName(options.InputFile);
 
             ResourcePresentationList Rpl = new ResourcePresentationList(fileBasename);  // string argument creates PlayoutId based on hash of the filename
@@ -57,7 +56,8 @@ namespace RplCreator
 
             try
             {
-                XmlData = LoadCinecanvasFile(options.InputFile);
+                XmlData = SubtitleReel.ParseFromXml(options.InputFile);
+
                 // Reminder:  PlayoutId is auto-generated in the ResourcePresentationList constructor
 
                 Rpl.ReelResources.EditRate = XmlData.EditRate;
@@ -125,27 +125,6 @@ namespace RplCreator
             finally
             {
             }
-        }
-
-        private static SubtitleReel LoadCinecanvasFile(String inputFile)
-        {
-            // Define the XmlSerializer casting to type SubtitleReel
-            XmlSerializer Deserializer = new XmlSerializer(typeof(SubtitleReel));
-
-            // Open the input file for reading
-            TextReader Reader = new StreamReader(inputFile);
-
-            // Deserialize the input file
-            object DeserializedData = Deserializer.Deserialize(Reader);
-
-            // Cast the deserialized data to the SubtitleReel type
-            SubtitleReel XmlData = (SubtitleReel)DeserializedData;
-
-            // Close the input file stream
-            Reader.Close();
-
-            // Send the deserialized data pointer back to the calling routine
-            return XmlData;
         }
 
         private static void SerializeRplFile(ResourcePresentationList inputRpl)
