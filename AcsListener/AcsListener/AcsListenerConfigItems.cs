@@ -7,6 +7,12 @@ namespace AcsListener
     /// <summary>Class that represents all configuration items for the AcsListener application</summary>
     class AcsListenerConfigItems
     {
+        public int AcsPort { get; } = 4170;              // default port of 4170, per SMPTE 430-10:2010 specifications, not a configurable value at this time
+        public int CommandPort { get; set; } = 13000;    // default port of 13000, arbitrary choice on our part
+        public string RplUrlPath { get; set; } = "";     // default path to the RPL files that are stored on the system in a website
+        public bool AutoReload { get; set; } = false;    // config item whether the "RELOAD" functionality requires manual invoke, or happens automatically
+        public bool VerboseOutput { get; set; } = false; // specifies whether certain sections of code will run and/or display extra information (for debugging purposes)
+
         /// <summary>Initializes a new instance of the <see cref="AcsListenerConfigItems"/> class.</summary>
         public AcsListenerConfigItems()
         {
@@ -62,12 +68,23 @@ namespace AcsListener
             {
                 Log.Error($"Error attempting to read the AutoReload configuration: {ex.Message}");
             }
-        }
 
-        public int CommandPort { get; set; } = 13000;    // default port of 13000, arbitrary choice on our part
-        public int AcsPort { get; } = 4170;              // default port of 4170, per SMPTE 430-10:2010 specifications, not a configurable value at this time
-        public string RplUrlPath { get; set; } = "";     // default path to the RPL files that are stored on the system in a website
-        public bool AutoReload { get; set; } = false;  // config item whether the "RELOAD" functionality requires manual invoke, or happens automatically
+            // Get the VerboseOutput value
+            try
+            {
+                var keyValueVerboseOutput = ConfigurationManager.AppSettings.Get("VerboseOutput");
+                if (keyValueVerboseOutput != null)
+                {
+                    VerboseOutput = Convert.ToBoolean(keyValueVerboseOutput);
+                    Log.Debug($"Found VerboseOutput value: {VerboseOutput}");
+                }
+
+            }
+            catch (FormatException ex)
+            {
+                Log.Error($"Error attempting to read the VerboseOutput configuration: {ex.Message}");
+            }
+        }
 
         /// <summary>Converts to string.</summary>
         /// <returns>A <see cref="System.String"/> that represents this instance.</returns>
