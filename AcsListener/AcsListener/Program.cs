@@ -54,6 +54,7 @@ namespace AcsListener
             // For now we are going to ignore usage of the "debug" option and just proceed to opening up an instance of the AcsListener class
 
             AcsListener listener = new AcsListener();
+            listener.OnConnect += LogAcsConnection;
 
             // listener.Options.VerboseMode = opts.VerboseOutput;  // override whatever is in the configuration file
 
@@ -69,6 +70,13 @@ namespace AcsListener
         static void HandleParseError(IEnumerable<Error> errs)
         {
 
+        }
+
+        static void LogAcsConnection(object sender, AcsConnectedEventArgs args)
+        {
+            Thread thread = Thread.CurrentThread;
+
+            Log.Debug($"[Thread #{thread.ManagedThreadId}] AcsConnection detected incoming from the following Remote IP: {args.RemoteAddress}");
         }
     }
 }
