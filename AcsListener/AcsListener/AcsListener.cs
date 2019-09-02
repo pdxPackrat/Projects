@@ -20,14 +20,13 @@ namespace AcsListener
         // This next section represents static data that is stored at time of an RPL load action.  This should eventually
         // be moved to a static class to give greater control over how the data is set/read
 
-        #region StaticData
+        #region StaticData   
         private static Int32 DefaultAcsPort = 4170;       // Per SMPTE 430-10:2010 specifications
         private static Int32 DefaultCommandPort = 13000;  // Arbitrary port choice, but appears to be unassigned at the moment according to
         private static string DefaultRplUrlPath = "";
         private static IPAddress SavedLocalAddress;
         private static AcspLeaseTimer LeaseTimer;
         private static ManualResetEvent CanWriteToStream = new ManualResetEvent(false);
-        private static bool ConnectedToAcs = false;
         private static bool KillCommandReceived = false;
         private static NetworkStream ListenerStream;
         private static TcpClient ListenerClient;
@@ -38,14 +37,21 @@ namespace AcsListener
         private static RplLoadInformation RplReloadInfo;      // Set to RplLoadInfo if/when a new RplLoadInfo instance is created
         #endregion StaticData
 
-        public event AcsConnectedDelegate OnConnect;
+        private AcsConnectionInfo acsConnectionInfo;
+        public event AcsConnectionStatusDelegate OnConnect;
+        public event AcsConnectionStatusDelegate OnDisconnect;
+
+        // ReSharper disable once UnusedMember.Global
+        public bool ConnectedToAcs => acsConnectionInfo.ConnectedToAcs; // readonly version of ConnectedToAcs 
 
         public AcsListenerConfigItems Config;
 
         public AcsListener()
         {
             Config = new AcsListenerConfigItems();
+            acsConnectionInfo = new AcsConnectionInfo();
         }
+
 
         /// <summary>
         /// Start is responsible for setting up both the ACS and Command TcpListener processes.
@@ -205,7 +211,7 @@ namespace AcsListener
                     String commandGreeting = "COMMAND CONNECTION: WAITING FOR COMMAND INPUT\r\n";
 
                     // Check the static ConnectedToAcs property to determine whether we have a stable ACS connection or not
-                    if (ConnectedToAcs)
+                    if (acsConnectionInfo.ConnectedToAcs)
                     {
                         commandGreeting = commandGreeting + "( ACS connected ): ";
                     }
@@ -283,7 +289,7 @@ namespace AcsListener
                                     Log.Information($"Thread #{thread.ManagedThreadId}:  Command Received:  {commandBase.ToUpper()} {commandParameter}");
 
                                     // Confirm that we are connected to the ACS, and if so start processing input from Command connection
-                                    if (ConnectedToAcs is true)
+                                    if (acsConnectionInfo.ConnectedToAcs is true)
                                     {
                                         // Start processing based on which command was received
                                         switch (commandBase.ToUpper())
@@ -485,12 +491,12 @@ namespace AcsListener
                                                 break;
                                         }
                                     }
-                                    else if ((ConnectedToAcs is false) && (commandBase.ToUpper() == "STATUS"))
+                                    else if ((acsConnectionInfo.ConnectedToAcs is false) && (commandBase.ToUpper() == "STATUS"))
                                     {
                                         // the only functional command allowed when not connected to the ACS is "STATUS" 
                                         commandOutput = DoCommandStatus();
                                     }
-                                    else if ((ConnectedToAcs is false) && (commandBase.ToUpper() == "HELP"))
+                                    else if ((acsConnectionInfo.ConnectedToAcs is false) && (commandBase.ToUpper() == "HELP"))
                                     {
                                         // the only other command allowed is "HELP"
                                         commandOutput = DoCommandHelp();
@@ -509,7 +515,7 @@ namespace AcsListener
                                     }
 
                                     // Add a mode status output to the return string being sent to the command connection
-                                    if (ConnectedToAcs is true)
+                                    if (acsConnectionInfo.ConnectedToAcs is true)
                                     {
                                         commandOutput = commandOutput + "( ACS connected ): ";
                                     }
@@ -653,7 +659,7 @@ namespace AcsListener
         {
             string outputMessage;
 
-            if (ConnectedToAcs is true)
+            if (acsConnectionInfo.ConnectedToAcs is true)
             {
                 if (RplLoadInfo.LoadCount > 0)
                 {
@@ -709,7 +715,7 @@ namespace AcsListener
             string outputMessage = "";
 
             // Check to make sure we have a connected ACS
-            if (ConnectedToAcs is false)
+            if (acsConnectionInfo.ConnectedToAcs is false)
             {
                 outputMessage = "TIME command cannot be issued while ACS is disconnected";
                 return outputMessage;
@@ -765,7 +771,7 @@ namespace AcsListener
             // Need some additional logic here to handle whether an RPL has already been loaded or not
 
             // check to make sure that the NetworkStream is already set by the initial connection
-            if ((ConnectedToAcs is true) && (ListenerStream != null))
+            if ((acsConnectionInfo.ConnectedToAcs is true) && (ListenerStream != null))
             {
                 // Check to make sure that we have a PlayoutId chosen by the SELECT command
                 // as per SMPTE 430-10, we must have already performed a SetRplLocation and an UpdateTimeline before we can set
@@ -801,7 +807,7 @@ namespace AcsListener
             // Need some additional logic here to handle whether an RPL has already been loaded or not
 
             // check to make sure that the NetworkStream is already set by the initial connection
-            if ((ConnectedToAcs is true) && (ListenerStream != null))
+            if ((acsConnectionInfo.ConnectedToAcs is true) && (ListenerStream != null))
             {
                 // Check to make sure that we have a PlayoutId chosen by the SELECT command
                 // as per SMPTE 430-10, we must have already performed a SetRplLocation and an UpdateTimeline before we can set
@@ -832,7 +838,7 @@ namespace AcsListener
         {
             string result;
 
-            if (ConnectedToAcs is true)
+            if (acsConnectionInfo.ConnectedToAcs is true)
             {
                 result = "ACS: connected; Current Playout: ";
 
@@ -1095,9 +1101,9 @@ namespace AcsListener
             try
             {
                 IPEndPoint remoteEnd = (IPEndPoint) tempTcpClient.Client.RemoteEndPoint;
-                IPAddress remoteAddress = remoteEnd.Address;
+                acsConnectionInfo.RemoteIpAddress = remoteEnd.Address;
 
-                Log.Information($"[Thread #: {thread.ManagedThreadId}] Connection Established! RemoteIP: {remoteAddress}");
+                Log.Information($"[Thread #: {thread.ManagedThreadId}] Connection Established! RemoteIP: {acsConnectionInfo.RemoteIpAddress}");
 
                 // Presumably the ACS has established, but we need to make sure that it IS an ACS device that is connecting on 4170
 
@@ -1109,14 +1115,6 @@ namespace AcsListener
                 ProcessAnnounceRrp(tempStream);
 
                 // If we made it this far, then presumably we ARE connected to an ACS device
-                // Check to see if anything has registered for this event, and if so, process it
-
-                if (OnConnect != null) 
-                {
-                    AcsConnectedEventArgs args = new AcsConnectedEventArgs();
-                    args.RemoteAddress = remoteAddress;
-                    OnConnect(this, args);
-                }
 
                 if ((ListenerClient != null) && (ListenerClient.Connected))
                 {
@@ -1151,7 +1149,15 @@ namespace AcsListener
                 // Since we have proven it is an ACS talking to us, this will become the new ACS connection
                 ListenerClient = tempTcpClient;
                 ListenerStream = tempStream;
-                ConnectedToAcs = true; // set the static variable to true to let CommandProcess know if connection has occurred
+                acsConnectionInfo.ConnectedToAcs = true; // set the static variable to true to let CommandProcess know if connection has occurred
+
+                // Check to see if anything is registered for this event, and if so, process it
+                if (OnConnect != null) 
+                {
+                    AcsConnectionStatusEventArgs args = new AcsConnectionStatusEventArgs();
+                    args.RemoteAddress = acsConnectionInfo.RemoteIpAddress;
+                    OnConnect(this, args);
+                }
 
                 KillCommandReceived = false; // Initialize the control logic, only set to true by DoCommandKill()
 
@@ -1333,7 +1339,15 @@ namespace AcsListener
             RplLoadInfo = new RplLoadInformation();   // effectively clear out the static RPL information
             Log.Debug($"[Thread #: {thread.ManagedThreadId}] Cleared out old RPL information");
 
-            ConnectedToAcs = false;   // Set the flag to indicate that connection to/from the ACS has been terminated
+            acsConnectionInfo.ConnectedToAcs = false;   // Set the flag to indicate that connection to/from the ACS has been terminated
+
+            // Check to see if anything is registered for this event, and if so, process it
+            if (OnDisconnect != null)
+            {
+                AcsConnectionStatusEventArgs args = new AcsConnectionStatusEventArgs();
+                args.RemoteAddress = acsConnectionInfo.RemoteIpAddress;
+                OnDisconnect(this, args);
+            }
         }
 
         /// <summary>Loads the ResourcePresentationList (RPL) from the supplied URL in to memory and returns a deserialized reference to that object</summary>

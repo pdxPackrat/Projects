@@ -55,6 +55,7 @@ namespace AcsListener
 
             AcsListener listener = new AcsListener();
             listener.OnConnect += LogAcsConnection;
+            listener.OnDisconnect += LogAcsDisconnection;
 
             // listener.Options.VerboseMode = opts.VerboseOutput;  // override whatever is in the configuration file
 
@@ -72,11 +73,18 @@ namespace AcsListener
 
         }
 
-        static void LogAcsConnection(object sender, AcsConnectedEventArgs args)
+        static void LogAcsConnection(object sender, AcsConnectionStatusEventArgs args)
         {
             Thread thread = Thread.CurrentThread;
 
-            Log.Debug($"[Thread #{thread.ManagedThreadId}] AcsConnection detected incoming from the following Remote IP: {args.RemoteAddress}");
+            Log.Debug($"[Thread #{thread.ManagedThreadId}] ACS Device connection has been detected incoming from the following Remote IP: {args.RemoteAddress}");
+        }
+
+        static void LogAcsDisconnection(object sender, AcsConnectionStatusEventArgs args)
+        {
+            Thread thread = Thread.CurrentThread;
+
+            Log.Information($"[Thread #{thread.ManagedThreadId}] ACS Device  at the following Remote IP address ({args.RemoteAddress}) has disconnected");
         }
     }
 }
