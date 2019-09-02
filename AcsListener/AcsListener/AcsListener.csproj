@@ -96,6 +96,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AcsConnectionStatusDelegate.cs" />
+    <Compile Include="AcsConnectionStatusEventArgs.cs" />
+    <Compile Include="AcsConnectionInfo.cs" />
     <Compile Include="AcsListener.cs" />
     <Compile Include="AcsListenerConfigItems.cs" />
     <Compile Include="AcspAnnounceException.cs" />
