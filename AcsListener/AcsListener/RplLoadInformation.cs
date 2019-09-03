@@ -145,8 +145,10 @@ namespace AcsListener
         }
 
         /// <summary>
-        /// GetPlayoutData returns the RplPlayoutData object of the currently selected Playout ID from the dictionary
+        /// GetPlayoutData returns the RplPlayoutData object of the currently selected Playout ID from the dictionary.
+        /// Proper usage would be to make sure that there is Playout data available first by checking the IsPlayoutSelected property.
         /// </summary>
+        /// <exception cref="InvalidOperationException"></exception>
         /// <returns>RplPlayoutData object of the currently selected Playout ID</returns>
         public RplPlayoutData GetPlayoutData()
         {

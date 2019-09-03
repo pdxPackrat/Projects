@@ -336,15 +336,7 @@ namespace AcsListener
                                                     {
                                                         RplPlayoutData playoutData = RplLoadInfo.GetPlayoutData();
 
-                                                        if (playoutData.EditRate != "")
-                                                        {
-                                                            string timeOffsetInput = commandParameter;
-                                                            commandOutput = DoCommandTime(timeOffsetInput, playoutData.EditRate);
-                                                        }
-                                                        else
-                                                        {
-                                                            commandOutput = "TIME command can only be used after a successful LOAD command has been issued";
-                                                        }
+                                                        commandOutput = DoCommandTime(commandParameter);
                                                     }
                                                     else
                                                     {
@@ -389,17 +381,10 @@ namespace AcsListener
                                                         {
                                                             RplPlayoutData playoutData = RplLoadInfo.GetPlayoutData();
 
-                                                            if (playoutData.EditRate != "")
-                                                            {
-                                                                // If we reached this point then we presumably have a good RPL, so send 
-                                                                // a UpdateTimeline request per SMPTE 430-10, which states that the RPL must be set first, 
-                                                                // then an UpdateTimeline sent, before any OutputMode can be set. 
-                                                                commandOutput = commandOutput + "\r\n" + DoCommandTime("00:00", playoutData.EditRate);
-                                                            }
-                                                            else
-                                                            {
-                                                                commandOutput = "Error: SELECT succeeded, but something is wrong with the Playout data.  EditRate is blank.";
-                                                            }
+                                                            // If we reached this point then we presumably have a good RPL, so send 
+                                                            // a UpdateTimeline request per SMPTE 430-10, which states that the RPL must be set first, 
+                                                            // then an UpdateTimeline sent, before any OutputMode can be set. 
+                                                            commandOutput = commandOutput + "\r\n" + DoCommandTime("00:00");
                                                         }
                                                         else
                                                         {
@@ -706,31 +691,59 @@ namespace AcsListener
             RplLoadInfo.ClearCurrentPlayout();  // Sets the current PlayoutId to 0 and the IsPlayoutSelected will return false
         }
 
-        /// <summary>  Executes an AcspUpdateTimelineRequest to the ACS</summary>
+        /// <summary>
+        ///   <para>Executes an AcspUpdateTimelineRequest to the ACS.  Regarding the required order of operation: <br />
+        /// The TIME command cannot be used until a successful DoCommandSelect() has been performed, which itself requires that a successful DoCommandLoad() has been performed. <br /></para>
+        /// </summary>
         /// <param name="timeOffsetInput">The time offset input.</param>
-        /// <param name="editRateInput">The edit rate input, as provided from data from the RPL file</param>
         /// <returns>String containing any relevant output message back to the CommandProcess connection.</returns>
-        private string DoCommandTime(string timeOffsetInput, string editRateInput)
+        private string DoCommandTime(string timeOffsetInput)
         {
             string outputMessage = "";
+            RplPlayoutData playoutData;
 
-            // Check to make sure we have a connected ACS
+            // We need to check to make sure we have a connected ACS, and then following that some data validation
             if (acsConnectionInfo.ConnectedToAcs is false)
             {
                 outputMessage = "TIME command cannot be issued while ACS is disconnected";
                 return outputMessage;
             }
+ 
+            // Check that an RPL has been selected first
+            if (RplLoadInfo.IsPlayoutSelected is true)
+            {
+                // Get the playout data for our analysis
+                try
+                {
+                    playoutData = RplLoadInfo.GetPlayoutData();
+                }
+                catch (InvalidOperationException)
+                {
+                    outputMessage = "Error attempting to get Playout data before anything was SELECT-ed";
+                    Log.Error(outputMessage);
+                    return outputMessage;
+                }
+            }
+            else
+            {
+                outputMessage = "TIME command cannot be used until an RPL is chosen by SELECT";
+                return outputMessage;
+            }
 
-            // First, we need to construct an RplReelDuration from the timeOffsetInput that was passed to us.  
-            // In this version of DoCommandTime, we are (for now) assuming an editRateInput of "25 1" passed in
-            // but eventually we will get this information from the loaded RPL file
+            // We need to make sure that EditRate, which is needed for our time units calculation, has value
+            if (string.IsNullOrEmpty(playoutData.EditRate))
+            {
+                outputMessage = "TIME command cannot be processed.  EditRate needs a value";
+                return outputMessage;
+            }
 
-            RplReelDuration reelDuration;
+            // Next, we need to construct an RplReelDuration from the timeOffsetInput that was passed to us.  
+
             UInt64 updatedEditUnits;
 
             try
             {
-                reelDuration = new RplReelDuration(timeOffsetInput, editRateInput);
+                var reelDuration = new RplReelDuration(timeOffsetInput, playoutData.EditRate);
                 updatedEditUnits = reelDuration.EditUnits;
             }
             catch (FormatException ex)
@@ -738,24 +751,12 @@ namespace AcsListener
                 outputMessage = "Error: " + ex.Message;
                 return outputMessage;
             }
-            finally
-            {
-            }
 
-            // Some basic validation that we have a successfully loaded RPL
-            if (RplLoadInfo.IsPlayoutSelected is true)
-            {
-                RplPlayoutData playoutData = RplLoadInfo.GetPlayoutData();
+            // We have already validated earlier that we have an RPL selected, so proceeding forward is safe
 
-                // Just a reminder that once the ACS has an updated timeline, its internal clock starts processing immediately
-                ProcessUpdateTimelineRrp(playoutData.PlayoutId, updatedEditUnits);
-                outputMessage = "TIME command issued with:\r\n" + " Time: " + timeOffsetInput + "\r\n EditRate: " + editRateInput + "\r\n EditUnits: " + updatedEditUnits;
-            }
-            else
-            {
-                outputMessage = "Error:  Attempted a DoCommandTime call without a properly loaded RPL file first";
-            }
-
+            // Just a reminder that once the ACS has an updated timeline, its internal clock starts processing immediately
+            ProcessUpdateTimelineRrp(playoutData.PlayoutId, updatedEditUnits);
+            outputMessage = "TIME command issued with:\r\n" + " Time: " + timeOffsetInput + "\r\n EditRate: " + playoutData.EditRate + "\r\n EditUnits: " + updatedEditUnits;
             return outputMessage;
         }
 
