@@ -560,7 +560,7 @@ namespace AcsListener
         }
 
         /// <summary>  Processes the necessary stuff to perform a RELOAD operation (whether manual or auto)</summary>
-        /// <param name="manualReloadMode">Whether this is a RELOAD from CommandProcess (manual) or not (auto)</param>
+        /// <param name="manualReloadMode">Whether this is a RELOAD from CommandProcess/IntegrationPoint (manual) or not (auto)</param>
         /// <returns>String representing the output from the child commands</returns>
         public string DoCommandReload(Boolean manualReloadMode)
         {
