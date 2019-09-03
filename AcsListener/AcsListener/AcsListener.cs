@@ -1646,7 +1646,7 @@ namespace AcsListener
                         } // if (ListenerStream.DataAvailable == true)
                     } // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
                 }  // if (ListenerStream != null)
-                else  // if we reach this point then we need to force a NullReferenceException to be caught further up the stack
+                else  // if we reach this point then we need to force an ArgumentNullException to be caught further up the stack
                 {
                     Log.Error($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Error encountered with the ACS network stream");
                     throw new ArgumentNullException(nameof(ListenerStream), $"The ListenerStream object is null when it should be set");
@@ -1779,7 +1779,7 @@ namespace AcsListener
                         } // if (ListenerStream.DataAvailable == true)
                     } // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
                 } // if (ListenerStream != null)
-                else  // if we reach this point then we need to force a NullReferenceException to be caught further up the stack
+                else  // if we reach this point then we need to force an ArgumentNullException to be caught further up the stack
                 {
                     Log.Error($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Error encountered with the ACS network stream");
                     throw new ArgumentNullException(nameof(ListenerStream), $"The ListenerStream object is null when it should be set");
@@ -1888,7 +1888,7 @@ namespace AcsListener
                         } // if (ListenerStream.DataAvailable == true)
                     } // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
                 } // if (ListenerStream != null)
-                else  // if we reach this point then we need to force a NullReferenceException to be caught further up the stack
+                else  // if we reach this point then we need to force an ArgumentNullException to be caught further up the stack
                 {
                     Log.Error($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Error encountered with the ACS network stream");
                     throw new ArgumentNullException(nameof(ListenerStream), $"The ListenerStream object is null when it should be set");
@@ -1990,7 +1990,7 @@ namespace AcsListener
                         } // if (ListenerStream.DataAvailable == true)
                     } // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
                 } // if (ListenerStream != null)
-                else  // if we reach this point then we need to force a NullReferenceException to be caught further up the stack
+                else  // if we reach this point then we need to force an ArgumentNullException to be caught further up the stack
                 {
                     Log.Error($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Error encountered with the ACS network stream");
                     throw new ArgumentNullException(nameof(ListenerStream), $"The ListenerStream object is null when it should be set");
@@ -2092,7 +2092,7 @@ namespace AcsListener
                         } // if (ListenerStream.DataAvailable == true)
                     } // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
                 } // if (ListenerStream != null)
-                else  // if we reach this point then we need to force a NullReferenceException to be caught further up the stack
+                else  // if we reach this point then we need to force an ArgumentNullException to be caught further up the stack
                 {
                     Log.Error($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Error encountered with the ACS network stream");
                     throw new ArgumentNullException(nameof(ListenerStream), $"The ListenerStream object is null when it should be set");
@@ -2193,7 +2193,7 @@ namespace AcsListener
                         } // if (ListenerStream.DataAvailable == true)
                     } // end while(stopwatch.ElapsedMilliseconds < timeoutValue)
                 } // if (ListenerStream != null)
-                else  // if we reach this point then we need to force a NullReferenceException to be caught further up the stack
+                else  // if we reach this point then we need to force an ArgumentNullException to be caught further up the stack
                 {
                     Log.Error($"[Thread #{thread.ManagedThreadId}, RequestID #{CurrentRequestId}]: Error encountered with the ACS network stream");
                     throw new ArgumentNullException(nameof(ListenerStream), $"The ListenerStream object is null when it should be set");

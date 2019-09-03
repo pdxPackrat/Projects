@@ -19,7 +19,7 @@ namespace AcsListener
         {
             if (inputClient is null)
             {
-                throw new NullReferenceException("Error: inputClient cannot be NULL");
+                throw new ArgumentNullException("inputClient","Error: inputClient cannot be NULL");
             }
 
             this._client = inputClient;
@@ -29,12 +29,12 @@ namespace AcsListener
         {
             if (inputClient is null)
             {
-                throw new NullReferenceException("Error: inputClient cannot be NULL");
+                throw new ArgumentNullException("inputClient", "Error: inputClient cannot be NULL");
             }
 
             if (inputUrlPath is null)
             {
-                throw new NullReferenceException("Error: inputUrlPath cannot be NULL");
+                throw new ArgumentNullException("inputUrlPath", "Error: inputUrlPath cannot be NULL");
             }
 
             this._client = inputClient;
@@ -45,17 +45,17 @@ namespace AcsListener
         {
             if (inputClient is null)
             {
-                throw new NullReferenceException("Error: inputClient cannot be NULL");
+                throw new ArgumentNullException("inputClient", "Error: inputClient cannot be NULL");
             }
 
             if (inputUrlPath is null)
             {
-                throw new NullReferenceException("Error: inputUrlPath cannot be NULL");
+                throw new ArgumentNullException("inputUrlPath", "Error: inputUrlPath cannot be NULL");
             }
 
             if (inputTimeOffset is null)
             {
-                throw new NullReferenceException("Error: inputTimelineOffset cannot be NULL");
+                throw new ArgumentNullException("inputTimeOffset", "Error: inputTimelineOffset cannot be NULL");
             }
 
             this._client = inputClient;

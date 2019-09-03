@@ -96,7 +96,7 @@ namespace AcsListener
             {
                 if (_message == null)
                 {
-                    throw new NullReferenceException($"Error:  Status Response Message is null referenced");
+                    throw new InvalidOperationException($"Error:  Status Response Message is null referenced");
                 }
                 return _message;
             }

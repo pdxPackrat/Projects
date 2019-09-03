@@ -66,7 +66,7 @@ namespace SharedCommon
 
                 if (this._editRate == null)
                 {
-                    throw new NullReferenceException("Error: EditRate should never be allowed/set to null - this will mess up derivative calculations");
+                    throw new ArgumentNullException("value", "Error: EditRate should never be allowed/set to null - this will mess up derivative calculations");
                 }
 
                 // do some logic for parsing out and giving the Numerator and Denominator values
